@@ -1,10 +1,10 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { PreferencesProvider } from "@/context/PreferencesContext";
+import { VisualFXProvider } from "@/context/VisualFXProvider";
+import { AppShell } from "@/components/layout/AppShell";
 import { Navbar } from "@/components/Navbar";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Landing from "./pages/Landing";
@@ -23,24 +23,26 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <PreferencesProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Navbar />
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
-              <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
-              <Route path="/match" element={<ProtectedRoute><Match /></ProtectedRoute>} />
-              <Route path="/chat/:roomId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+        <VisualFXProvider>
+          <TooltipProvider>
+            <BrowserRouter>
+              <AppShell>
+                <Navbar />
+                <Routes>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/register" element={<Register />} />
+                  <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
+                  <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+                  <Route path="/match" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+                  <Route path="/chat/:roomId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+                  <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </AppShell>
+            </BrowserRouter>
+          </TooltipProvider>
+        </VisualFXProvider>
       </PreferencesProvider>
     </AuthProvider>
   </QueryClientProvider>

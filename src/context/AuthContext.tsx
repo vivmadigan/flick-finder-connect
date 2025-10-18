@@ -23,6 +23,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     setToken(null);
+    // Clear localStorage on logout
+    localStorage.removeItem('cinematch_preferences');
+    localStorage.removeItem('cinematch_liked_movies');
   };
 
   return (

@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePreferences } from '@/context/PreferencesContext';
+import { useVisualFX } from '@/context/VisualFXProvider';
 import { GenrePicker } from '@/features/onboarding/GenrePicker';
 import { LengthPicker } from '@/features/onboarding/LengthPicker';
-import { BokehBackdrop } from '@/components/BokehBackdrop';
-import { BokehOrbs } from '@/components/BokehOrbs';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +11,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function Onboarding() {
   const navigate = useNavigate();
   const { preferences, updatePreferences } = usePreferences();
+  const { setPreset } = useVisualFX();
   const [step, setStep] = useState(1);
+
+  useEffect(() => {
+    setPreset('standard');
+  }, [setPreset]);
 
   const handleNext = () => {
     if (step === 1 && !preferences.genre) return;
@@ -39,9 +43,6 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <BokehBackdrop />
-      <BokehOrbs />
-      
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-20">
         <div className="w-full max-w-5xl mx-auto space-y-8">
           {/* Progress indicator */}
@@ -101,13 +102,13 @@ export default function Onboarding() {
                 transition={{ duration: 0.28 }}
                 className="text-center space-y-6"
               >
-                <h2 className="text-3xl font-bold">You're all set!</h2>
+                <h2 className="text-3xl font-display font-semibold">You're all set!</h2>
                 <div className="max-w-md mx-auto space-y-4 text-left">
-                  <div className="p-4 rounded-lg backdrop-blur-glass border border-border/50">
+                  <div className="p-4 rounded-2xl backdrop-blur-glass border border-border/50">
                     <p className="text-sm text-muted-foreground">Genre</p>
                     <p className="font-semibold">{preferences.genre}</p>
                   </div>
-                  <div className="p-4 rounded-lg backdrop-blur-glass border border-border/50">
+                  <div className="p-4 rounded-2xl backdrop-blur-glass border border-border/50">
                     <p className="text-sm text-muted-foreground">Length</p>
                     <p className="font-semibold capitalize">{preferences.lengthBucket}</p>
                   </div>
@@ -130,7 +131,7 @@ export default function Onboarding() {
               Back
             </Button>
 
-            <Button onClick={handleNext} disabled={!canProceed()}>
+            <Button onClick={handleNext} disabled={!canProceed()} className="rounded-2xl px-4 py-3">
               {step === 3 ? 'Start Discovering' : 'Continue'}
               {step < 3 && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>

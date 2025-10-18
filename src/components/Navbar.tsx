@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { Film, User, LogOut } from 'lucide-react';
+import { User, LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,16 +10,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Logo } from '@/components/branding/Logo';
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-glass border-b border-border/50">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-glass border-b border-border/50 bg-background/50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <Film className="w-6 h-6 text-primary transition-transform duration-micro group-hover:scale-110" />
-          <h1 className="text-2xl font-bold text-foreground">CineMatch</h1>
+        <Link to="/" className="group">
+          <Logo size="sm" />
         </Link>
 
         <div className="flex items-center gap-4">

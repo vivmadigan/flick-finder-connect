@@ -1,11 +1,18 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { BokehBackdrop } from '@/components/BokehBackdrop';
-import { BokehOrbs } from '@/components/BokehOrbs';
+import { useVisualFX } from '@/context/VisualFXProvider';
+import { HalationGlow } from '@/components/visual/HalationGlow';
 import { Film, Heart, MessageCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Landing() {
+  const { setPreset } = useVisualFX();
+
+  useEffect(() => {
+    setPreset('hero');
+  }, [setPreset]);
+
   const steps = [
     {
       icon: Film,
@@ -26,28 +33,27 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      <BokehBackdrop />
-      <BokehOrbs />
-      
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Hero Section */}
-        <section className="flex-1 flex items-center justify-center px-4 py-20">
+        <section className="flex-1 flex items-center justify-center px-4 py-20 relative">
+          <HalationGlow intensity="high" />
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="text-center space-y-8 max-w-4xl mx-auto"
+            className="text-center space-y-8 max-w-4xl mx-auto relative z-10"
           >
-            <div className="inline-block">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <Film className="w-12 h-12 text-primary" />
-              </div>
-              <h1 className="text-5xl md:text-7xl font-bold mb-4 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent animate-gradient">
-                CineMatch
-              </h1>
-            </div>
+            <h1 className="text-5xl md:text-7xl font-display font-bold mb-4">
+              <span
+                className="bg-gradient-to-r from-[hsl(46,80%,65%)] via-[hsl(46,65%,52%)] to-[hsl(46,80%,65%)] bg-clip-text text-transparent"
+                style={{ textShadow: '0 2px 12px rgba(212,175,55,0.4)' }}
+              >
+                Cine
+              </span>
+              <span className="text-foreground/90">Match</span>
+            </h1>
             
-            <p className="text-2xl md:text-3xl text-foreground/90 font-light">
+            <p className="text-2xl md:text-3xl text-foreground/80 font-light font-display">
               Find your perfect movie date
             </p>
             
@@ -58,7 +64,7 @@ export default function Landing() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Link to="/register">
-                <Button size="lg" className="w-full sm:w-auto text-lg px-8 shadow-glow">
+                <Button size="lg" className="w-full sm:w-auto text-lg px-8 rounded-2xl shadow-glow">
                   Get Started
                 </Button>
               </Link>
@@ -66,7 +72,7 @@ export default function Landing() {
                 <Button
                   variant="outline"
                   size="lg"
-                  className="w-full sm:w-auto text-lg px-8 backdrop-blur-glass"
+                  className="w-full sm:w-auto text-lg px-8 rounded-2xl backdrop-blur-glass"
                 >
                   Log In
                 </Button>
@@ -84,7 +90,7 @@ export default function Landing() {
             viewport={{ once: true }}
             className="max-w-6xl mx-auto"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-display font-semibold text-center mb-12">
               How it works
             </h2>
             

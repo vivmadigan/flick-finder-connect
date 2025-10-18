@@ -29,7 +29,7 @@ interface GenrePickerProps {
 export function GenrePicker({ selected, onSelect }: GenrePickerProps) {
   return (
     <div className="space-y-4">
-      <h2 className="text-3xl font-bold text-center">
+      <h2 className="text-3xl font-display font-semibold text-center">
         Which genre are you in the mood for?
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-w-4xl mx-auto">

@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
+import { useVisualFX } from '@/context/VisualFXProvider';
 import { Match as MatchType, Movie } from '@/types';
 import { MatchService } from '@/lib/services/MatchService';
 import { MoviesService } from '@/lib/services/MoviesService';
 import { MatchCard } from '@/features/match/MatchCard';
-import { BokehBackdrop } from '@/components/BokehBackdrop';
-import { BokehOrbs } from '@/components/BokehOrbs';
 import { Button } from '@/components/ui/button';
 import { Loader2, PartyPopper } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +17,7 @@ export default function Match() {
   const location = useLocation();
   const { user } = useAuth();
   const { preferences } = usePreferences();
+  const { setPreset } = useVisualFX();
   const [matches, setMatches] = useState<MatchType[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -25,6 +25,10 @@ export default function Match() {
   const [allMovies, setAllMovies] = useState<Movie[]>([]);
 
   const likedMovieIds: string[] = location.state?.likedMovieIds || [];
+
+  useEffect(() => {
+    setPreset('standard');
+  }, [setPreset]);
 
   useEffect(() => {
     if (likedMovieIds.length === 0) {
@@ -130,8 +134,6 @@ export default function Match() {
   if (loading) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
-        <BokehBackdrop />
-        <BokehOrbs />
         <div className="relative z-10 text-center space-y-4">
           <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
           <p className="text-lg text-muted-foreground">Finding your matches...</p>
@@ -143,8 +145,6 @@ export default function Match() {
   if (matches.length === 0) {
     return (
       <div className="min-h-screen relative overflow-hidden flex items-center justify-center">
-        <BokehBackdrop />
-        <BokehOrbs />
         <div className="relative z-10 text-center space-y-4">
           <p className="text-lg text-muted-foreground">No matches found</p>
           <Button onClick={() => navigate('/discover')}>Back to Discovery</Button>
@@ -155,13 +155,10 @@ export default function Match() {
 
   return (
     <div className="min-h-screen relative overflow-hidden pt-20">
-      <BokehBackdrop />
-      <BokehOrbs />
-      
       <div className="relative z-10 container mx-auto px-4 py-8">
         <div className="max-w-2xl mx-auto space-y-8">
           <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold flex items-center justify-center gap-3">
+            <h1 className="text-4xl font-display font-semibold flex items-center justify-center gap-3">
               <PartyPopper className="w-8 h-8 text-primary" />
               You have matches!
             </h1>
