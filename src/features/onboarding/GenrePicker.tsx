@@ -39,7 +39,7 @@ export function GenrePicker({ selected, onSelect }: GenrePickerProps) {
             variant={selected === genre ? 'default' : 'outline'}
             onClick={() => onSelect(genre)}
             className={cn(
-              'h-auto py-4 px-4 text-sm transition-all duration-micro',
+              'h-auto py-4 px-4 text-sm transition-all rounded-2xl',
               selected === genre && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
             )}
           >

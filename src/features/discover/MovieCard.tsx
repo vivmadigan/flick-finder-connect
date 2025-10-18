@@ -18,9 +18,10 @@ export function MovieCard({ movie, onLike, onSkip, disabled }: MovieCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.28 }}
+      transition={{ duration: 0.24 }}
+      whileHover={{ scale: 1.01 }}
     >
-      <Card className="overflow-hidden backdrop-blur-glass border-border/50 hover:shadow-glow transition-shadow duration-micro">
+      <Card className="overflow-hidden backdrop-blur-glass border-border/50 hover:shadow-glow transition-all rounded-2xl">
         <div className="aspect-[2/3] relative overflow-hidden bg-muted">
           <img
             src={movie.poster}
@@ -31,7 +32,7 @@ export function MovieCard({ movie, onLike, onSkip, disabled }: MovieCardProps) {
         </div>
         <CardContent className="p-4 space-y-3">
           <div>
-            <h3 className="font-semibold text-lg line-clamp-1">{movie.title}</h3>
+            <h3 className="font-semibold text-lg line-clamp-1 font-display">{movie.title}</h3>
             <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
               <span>{movie.year}</span>
               <span>•</span>
@@ -63,7 +64,7 @@ export function MovieCard({ movie, onLike, onSkip, disabled }: MovieCardProps) {
             <Button
               variant="outline"
               size="lg"
-              className="flex-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors"
+              className="flex-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors rounded-2xl"
               onClick={onSkip}
               disabled={disabled}
             >
@@ -72,7 +73,7 @@ export function MovieCard({ movie, onLike, onSkip, disabled }: MovieCardProps) {
             </Button>
             <Button
               size="lg"
-              className="flex-1"
+              className="flex-1 rounded-2xl"
               onClick={onLike}
               disabled={disabled}
             >

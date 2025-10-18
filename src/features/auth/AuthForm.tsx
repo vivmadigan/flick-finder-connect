@@ -52,9 +52,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   };
 
   return (
-    <Card className="w-full max-w-md backdrop-blur-glass border-border/50">
+    <Card className="w-full max-w-md backdrop-blur-glass border-border/50 rounded-2xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl">
+        <CardTitle className="text-2xl font-display">
           {mode === 'login' ? 'Welcome back' : 'Create your account'}
         </CardTitle>
         <CardDescription>
@@ -73,40 +73,42 @@ export function AuthForm({ mode }: AuthFormProps) {
                 type="text"
                 required
                 value={formData.displayName}
-                onChange={(e) =>
-                  setFormData({ ...formData, displayName: e.target.value })
-                }
-              />
-            </div>
-          )}
-          
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
+              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })
               }
+              className="rounded-2xl"
             />
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
-              }
-            />
-          </div>
+        )}
+        
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            value={formData.email}
+            onChange={(e) =>
+              setFormData({ ...formData, email: e.target.value })
+            }
+            className="rounded-2xl"
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            value={formData.password}
+            onChange={(e) =>
+              setFormData({ ...formData, password: e.target.value })
+            }
+            className="rounded-2xl"
+          />
+        </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="w-full rounded-2xl" disabled={loading}>
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             {mode === 'login' ? 'Log in' : 'Sign up'}
           </Button>

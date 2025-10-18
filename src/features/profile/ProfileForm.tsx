@@ -38,9 +38,9 @@ export function ProfileForm() {
   if (!user) return null;
 
   return (
-    <Card className="backdrop-blur-glass border-border/50">
+    <Card className="backdrop-blur-glass border-border/50 rounded-2xl">
       <CardHeader>
-        <CardTitle>Profile Settings</CardTitle>
+        <CardTitle className="font-display">Profile Settings</CardTitle>
         <CardDescription>Update your profile information</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -65,33 +65,21 @@ export function ProfileForm() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
+              className="rounded-2xl"
             />
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" value={user.email} disabled />
+            <Input id="email" value={user.email} disabled className="rounded-2xl" />
             <p className="text-xs text-muted-foreground">Email cannot be changed</p>
           </div>
 
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" disabled={loading} className="rounded-2xl">
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Save Changes
           </Button>
         </form>
-
-        <div className="pt-6 border-t border-border/50">
-          <h3 className="text-sm font-medium text-destructive mb-2">Danger Zone</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Logout from your account
-          </p>
-          <Button variant="destructive" onClick={() => {
-            // Handled by Navbar logout
-            window.location.href = '/';
-          }}>
-            Log Out
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );

@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useVisualFX } from '@/context/VisualFXProvider';
 import { ChatWindow } from '@/features/chat/ChatWindow';
-import { BokehBackdrop } from '@/components/BokehBackdrop';
-import { BokehOrbs } from '@/components/BokehOrbs';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { User } from '@/types';
@@ -13,8 +12,13 @@ export default function Chat() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { setPreset } = useVisualFX();
 
   const otherUser: User | undefined = location.state?.otherUser;
+
+  useEffect(() => {
+    setPreset('dense');
+  }, [setPreset]);
 
   useEffect(() => {
     if (!roomId || !user) {
@@ -28,9 +32,6 @@ export default function Chat() {
 
   return (
     <div className="min-h-screen relative overflow-hidden pt-20">
-      <BokehBackdrop />
-      <BokehOrbs />
-      
       <div className="relative z-10 container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-6">
           <Button

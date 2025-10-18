@@ -19,9 +19,9 @@ export function MatchCard({ match, onAccept, onReject, disabled }: MatchCardProp
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.28 }}
+      transition={{ duration: 0.24 }}
     >
-      <Card className="overflow-hidden backdrop-blur-glass border-border/50 max-w-lg mx-auto">
+      <Card className="overflow-hidden backdrop-blur-glass border-border/50 max-w-lg mx-auto rounded-2xl">
         <CardContent className="p-6 space-y-6">
           {/* User info */}
           <div className="flex items-center gap-4">
@@ -32,7 +32,7 @@ export function MatchCard({ match, onAccept, onReject, disabled }: MatchCardProp
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="text-xl font-semibold">{match.user.displayName}</h3>
+              <h3 className="text-xl font-semibold font-display">{match.user.displayName}</h3>
               <p className="text-sm text-muted-foreground">
                 {match.sharedMovies.length} shared {match.sharedMovies.length === 1 ? 'movie' : 'movies'}
               </p>
@@ -49,15 +49,15 @@ export function MatchCard({ match, onAccept, onReject, disabled }: MatchCardProp
               {match.sharedMovies.map((movie) => (
                 <div
                   key={movie.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-card/50 border border-border/50"
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-card/50 border border-border/50"
                 >
                   <img
                     src={movie.poster}
                     alt={movie.title}
-                    className="w-12 h-18 object-cover rounded"
+                    className="w-12 h-18 object-cover rounded-lg"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium line-clamp-1">{movie.title}</p>
+                    <p className="font-medium line-clamp-1 font-display">{movie.title}</p>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>{movie.year}</span>
                       <span>•</span>
@@ -85,7 +85,7 @@ export function MatchCard({ match, onAccept, onReject, disabled }: MatchCardProp
               <Button
                 variant="outline"
                 size="lg"
-                className="flex-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors"
+                className="flex-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors rounded-2xl"
                 onClick={onReject}
                 disabled={disabled}
               >
@@ -94,7 +94,7 @@ export function MatchCard({ match, onAccept, onReject, disabled }: MatchCardProp
               </Button>
               <Button
                 size="lg"
-                className="flex-1"
+                className="flex-1 rounded-2xl"
                 onClick={onAccept}
                 disabled={disabled}
               >

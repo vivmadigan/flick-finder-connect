@@ -39,7 +39,7 @@ export function LengthPicker({ selected, onSelect }: LengthPickerProps) {
           <Card
             key={option.value}
             className={cn(
-              'cursor-pointer transition-all duration-micro hover:scale-[1.02] hover:shadow-glow',
+              'cursor-pointer transition-all hover:scale-[1.02] hover:shadow-glow rounded-2xl',
               selected === option.value && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
             )}
             onClick={() => onSelect(option.value)}

@@ -74,14 +74,14 @@ export function ChatWindow({ roomId, otherUserName, otherUserAvatar }: ChatWindo
   };
 
   return (
-    <Card className="flex flex-col h-[600px] backdrop-blur-glass border-border/50">
+    <Card className="flex flex-col h-[600px] backdrop-blur-glass border-border/50 rounded-2xl">
       <CardHeader className="border-b border-border/50">
         <div className="flex items-center gap-3">
           <Avatar>
             <AvatarImage src={otherUserAvatar} alt={otherUserName} />
             <AvatarFallback>{otherUserName.slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <CardTitle>{otherUserName}</CardTitle>
+          <CardTitle className="font-display">{otherUserName}</CardTitle>
         </div>
       </CardHeader>
       
@@ -139,8 +139,9 @@ export function ChatWindow({ roomId, otherUserName, otherUserAvatar }: ChatWindo
             onChange={(e) => setInput(e.target.value)}
             placeholder="Type a message..."
             disabled={loading}
+            className="rounded-2xl"
           />
-          <Button type="submit" size="icon" disabled={loading || !input.trim()}>
+          <Button type="submit" size="icon" disabled={loading || !input.trim()} className="rounded-2xl">
             <Send className="w-4 h-4" />
           </Button>
         </form>
