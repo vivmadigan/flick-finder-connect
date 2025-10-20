@@ -5,6 +5,7 @@ import { usePreferences } from '@/context/PreferencesContext';
 import { ProfileForm } from '@/features/profile/ProfileForm';
 import { Button } from '@/components/ui/button';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -41,18 +42,27 @@ export default function Profile() {
 
           {/* Danger Zone */}
           <div className="mt-12 p-6 border border-destructive/30 rounded-2xl bg-destructive/5">
-            <h3 className="text-lg font-semibold mb-2 text-destructive">Reset Preferences</h3>
+            <h3 className="text-lg font-display font-semibold mb-2 text-destructive">Reset Preferences</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Clear your genre, length, and liked movies to start fresh.
+              Clear your genre, length, and liked movies so you can choose again.
             </p>
-            <Button
-              variant="outline"
-              onClick={() => setShowResetModal(true)}
-              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset & Rechoose
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowResetModal(true)}
+                    className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-2xl"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset & Rechoose
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Start over and pick again</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>

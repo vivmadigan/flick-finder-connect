@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useVisualFX } from '@/context/VisualFXProvider';
 import { Movie } from '@/types';
 import { MoviesService } from '@/lib/services/MoviesService';
-import { MovieCard } from '@/features/discover/MovieCard';
+import { SingleMovieCard } from '@/components/discover/SingleMovieCard';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { DecisionPromptModal } from '@/components/ui/DecisionPromptModal';
 import { toast } from 'sonner';
 import { Loader2, RotateCcw } from 'lucide-react';
 import {
@@ -17,8 +18,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { AnimatePresence } from 'framer-motion';
 
-const BATCH_SIZE = 10;
+const PROMPT_INTERVAL = 5;
 
 export default function Discover() {
   const navigate = useNavigate();
@@ -26,10 +28,12 @@ export default function Discover() {
   const { preferences, likedMovieIds, addLikedMovie, resetPreferences } = usePreferences();
   const { setPreset } = useVisualFX();
   const [movies, setMovies] = useState<Movie[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [skip, setSkip] = useState(0);
-  const [hasLikedInCurrentBatch, setHasLikedInCurrentBatch] = useState(false);
+  const [decisionCount, setDecisionCount] = useState(0);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [showDecisionPrompt, setShowDecisionPrompt] = useState(false);
+  const [processingAction, setProcessingAction] = useState(false);
 
   useEffect(() => {
     setPreset('dense');
@@ -44,21 +48,47 @@ export default function Discover() {
 
   useEffect(() => {
     if (preferences.genre && preferences.lengthBucket) {
-      loadMovies();
+      loadInitialMovies();
     }
-  }, [skip, preferences]);
+  }, [preferences]);
 
-  const loadMovies = async () => {
+  // Load from localStorage
+  useEffect(() => {
+    const savedProgress = localStorage.getItem('cinematch_discover_progress');
+    if (savedProgress) {
+      try {
+        const { currentIndex: savedIndex, decisionCount: savedCount } = JSON.parse(savedProgress);
+        setCurrentIndex(savedIndex || 0);
+        setDecisionCount(savedCount || 0);
+      } catch (e) {
+        console.error('Failed to load progress:', e);
+      }
+    }
+  }, []);
+
+  // Save to localStorage
+  useEffect(() => {
+    localStorage.setItem('cinematch_discover_progress', JSON.stringify({ currentIndex, decisionCount }));
+  }, [currentIndex, decisionCount]);
+
+  // Check if we should show the decision prompt
+  useEffect(() => {
+    if (decisionCount > 0 && decisionCount % PROMPT_INTERVAL === 0) {
+      setShowDecisionPrompt(true);
+      console.log('[Analytics] Five-pick-prompt-shown', { decisionCount, likedCount: likedMovieIds.length });
+    }
+  }, [decisionCount]);
+
+  const loadInitialMovies = async () => {
     setLoading(true);
     try {
-      const newMovies = await MoviesService.getMovies(
+      const allMovies = await MoviesService.getMovies(
         preferences.genre,
         preferences.lengthBucket,
-        skip,
-        BATCH_SIZE
+        0,
+        100
       );
-      setMovies(newMovies);
-      setHasLikedInCurrentBatch(false);
+      setMovies(allMovies);
     } catch (error) {
       toast.error('Failed to load movies');
     } finally {
@@ -66,85 +96,194 @@ export default function Discover() {
     }
   };
 
-  const handleLike = async (movie: Movie) => {
-    if (!user) return;
+  const loadMoreMovies = async () => {
+    if (loading) return;
+    
+    setLoading(true);
     try {
-      await MoviesService.likeMovie(user.id, movie.id);
-      addLikedMovie(movie.id);
-      setHasLikedInCurrentBatch(true);
-      toast.success(`Liked ${movie.title}`);
+      const moreMovies = await MoviesService.getMovies(
+        preferences.genre,
+        preferences.lengthBucket,
+        movies.length,
+        50
+      );
+      setMovies(prev => [...prev, ...moreMovies]);
     } catch (error) {
-      toast.error('Failed to like movie');
+      toast.error('Failed to load more movies');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSkip = async (movie: Movie) => {
-    if (!user) return;
+  const handleAction = useCallback(async (action: 'like' | 'skip') => {
+    if (!user || processingAction || currentIndex >= movies.length) return;
+    
+    setProcessingAction(true);
+    const movie = movies[currentIndex];
+    
     try {
-      await MoviesService.skipMovie(user.id, movie.id);
-      toast('Skipped', { duration: 1000 });
+      if (action === 'like') {
+        await MoviesService.likeMovie(user.id, movie.id);
+        addLikedMovie(movie.id);
+        toast.success(`Want to watch ${movie.title}`);
+        console.log('[Analytics] Like', { movieId: movie.id, title: movie.title });
+      } else {
+        await MoviesService.skipMovie(user.id, movie.id);
+        console.log('[Analytics] Skip', { movieId: movie.id, title: movie.title });
+      }
+      
+      setDecisionCount(prev => prev + 1);
+      
+      // Move to next movie
+      if (currentIndex < movies.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+      } else {
+        // Need more movies
+        await loadMoreMovies();
+        setCurrentIndex(prev => prev + 1);
+      }
     } catch (error) {
-      console.error('Failed to skip movie:', error);
+      toast.error(`Failed to ${action} movie`);
+      console.error(`Failed to ${action} movie:`, error);
+    } finally {
+      setProcessingAction(false);
     }
-  };
+  }, [user, currentIndex, movies, processingAction, addLikedMovie]);
 
-  const handleStopChoosing = () => {
+  const handleLike = useCallback(() => handleAction('like'), [handleAction]);
+  const handleSkip = useCallback(() => handleAction('skip'), [handleAction]);
+
+  const handleFindMatches = () => {
     if (likedMovieIds.length === 0) return;
+    console.log('[Analytics] Find-match-clicked', { likedCount: likedMovieIds.length, decisionCount });
     navigate('/match', { state: { likedMovieIds } });
+  };
+
+  const handleSeeMore = () => {
+    setShowDecisionPrompt(false);
+    console.log('[Analytics] See-more-clicked', { decisionCount });
   };
 
   const handleReset = () => {
     resetPreferences();
+    localStorage.removeItem('cinematch_discover_progress');
     setShowResetModal(false);
     toast.success('Preferences reset');
+    console.log('[Analytics] Reset');
     navigate('/onboarding');
   };
 
-  const canStopChoosing = likedMovieIds.length > 0 && hasLikedInCurrentBatch;
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (processingAction || showDecisionPrompt || showResetModal) return;
+      
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleLike();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        handleSkip();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleLike, handleSkip, processingAction, showDecisionPrompt, showResetModal]);
+
+  const currentMovie = movies[currentIndex];
 
   return (
     <div className="min-h-screen relative pt-20">
       <div className="relative z-10 container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-8">
           <div className="flex items-start justify-between gap-4">
             <div className="text-center flex-1 space-y-2">
               <h1 className="text-4xl font-display font-semibold">Pick movies you'd watch tonight</h1>
               <p className="text-muted-foreground">
-                {likedMovieIds.length > 0 ? `${likedMovieIds.length} liked` : 'Like at least one movie to find matches'}
+                {likedMovieIds.length > 0 
+                  ? `${likedMovieIds.length} liked · ${decisionCount > 0 ? `${decisionCount} reviewed` : 'Keep going!'}`
+                  : 'Like at least one movie to find matches'}
               </p>
+              {decisionCount < 5 && decisionCount > 0 && (
+                <p className="text-sm text-muted-foreground">{decisionCount} / 5</p>
+              )}
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setShowResetModal(true)}><RotateCcw className="w-4 h-4" /></Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => setShowResetModal(true)}
+                    className="rounded-2xl"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reset & Rechoose
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Start over and pick again</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           {loading && movies.length === 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Array.from({ length: BATCH_SIZE }).map((_, i) => (
-                <div key={i} className="space-y-4"><Skeleton className="aspect-[2/3] w-full rounded-2xl" /><Skeleton className="h-4 w-3/4" /></div>
-              ))}
+            <div className="flex justify-center">
+              <div className="w-full max-w-md space-y-4">
+                <Skeleton className="aspect-[2/3] w-full rounded-2xl" />
+                <Skeleton className="h-6 w-3/4 mx-auto" />
+                <Skeleton className="h-4 w-full" />
+              </div>
             </div>
-          ) : movies.length === 0 ? (
+          ) : !currentMovie ? (
             <div className="text-center space-y-6 py-12">
               <p className="text-lg text-muted-foreground">No more movies match your filters.</p>
-              <Button onClick={() => setSkip(0)}>Retry</Button>
+              <div className="flex gap-3 justify-center">
+                <Button variant="outline" onClick={() => navigate('/onboarding')} className="rounded-2xl">
+                  Change filters
+                </Button>
+                <Button onClick={() => window.location.reload()} className="rounded-2xl">
+                  Retry
+                </Button>
+              </div>
             </div>
           ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {movies.map((movie) => (
-                  <MovieCard key={movie.id} movie={movie} onLike={() => handleLike(movie)} onSkip={() => handleSkip(movie)} disabled={loading} />
-                ))}
-              </div>
-              <div className="flex gap-4 justify-center">
-                <Button variant="outline" size="lg" onClick={() => setSkip(p => p + BATCH_SIZE)} disabled={loading} className="rounded-2xl">
-                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Show 10 more
-                </Button>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><div><Button size="lg" onClick={handleStopChoosing} disabled={!canStopChoosing || loading} className="rounded-2xl">Find Matches</Button></div></TooltipTrigger>{!canStopChoosing && <TooltipContent><p>Like at least one movie from this batch</p></TooltipContent>}</Tooltip></TooltipProvider>
-              </div>
-            </>
+            <AnimatePresence mode="wait">
+              <SingleMovieCard
+                key={currentMovie.id}
+                movie={currentMovie}
+                onLike={handleLike}
+                onSkip={handleSkip}
+                disabled={processingAction}
+              />
+            </AnimatePresence>
           )}
+
+          <div className="text-center text-sm text-muted-foreground">
+            <p>Keyboard: <kbd className="px-2 py-1 bg-muted rounded">Enter</kbd> or <kbd className="px-2 py-1 bg-muted rounded">Space</kbd> to like · <kbd className="px-2 py-1 bg-muted rounded">S</kbd> to skip</p>
+          </div>
         </div>
       </div>
-      <ConfirmModal open={showResetModal} onOpenChange={setShowResetModal} title="Reset preferences?" description="This clears your genre, length, and liked movies." confirmText="Reset" variant="destructive" onConfirm={handleReset} />
+
+      <ConfirmModal 
+        open={showResetModal} 
+        onOpenChange={setShowResetModal} 
+        title="Reset preferences?" 
+        description="This clears your genre, length, and liked movies so you can choose again." 
+        confirmText="Reset" 
+        variant="destructive" 
+        onConfirm={handleReset} 
+      />
+
+      <DecisionPromptModal
+        open={showDecisionPrompt}
+        onOpenChange={setShowDecisionPrompt}
+        decisionCount={decisionCount}
+        likedCount={likedMovieIds.length}
+        onSeeMore={handleSeeMore}
+        onFindMatches={handleFindMatches}
+      />
     </div>
   );
 }

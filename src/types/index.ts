@@ -14,6 +14,16 @@ export interface Movie {
   genres: Genre[];
   lengthBucket: LengthBucket;
   rating?: number;
+  synopsis: string;
+}
+
+export interface Conversation {
+  id: string;
+  roomId: string;
+  otherUser: User;
+  lastMessage?: string;
+  lastMessageTime?: Date;
+  unreadCount: number;
 }
 
 export type Genre = 
