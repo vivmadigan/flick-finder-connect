@@ -13,6 +13,7 @@ import Register from "./pages/Register";
 import Onboarding from "./pages/Onboarding";
 import Discover from "./pages/Discover";
 import Match from "./pages/Match";
+import Chats from "./pages/Chats";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -35,6 +36,7 @@ const App = () => (
                   <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                   <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/match" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+                  <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                   <Route path="/chat/:roomId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                   <Route path="*" element={<NotFound />} />

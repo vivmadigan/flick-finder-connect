@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useVisualFX } from '@/context/VisualFXProvider';
+import { ChatService } from '@/lib/services/ChatService';
 import { ChatWindow } from '@/features/chat/ChatWindow';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -23,7 +24,28 @@ export default function Chat() {
   useEffect(() => {
     if (!roomId || !user) {
       navigate('/discover');
+      return;
     }
+
+    // Initialize SignalR connection
+    const initChat = async () => {
+      try {
+        // Get auth token from context if available
+        const token = localStorage.getItem('cinematch_token');
+        await ChatService.initializeSignalR(token || undefined);
+      } catch (error) {
+        console.error('Failed to initialize chat:', error);
+      }
+    };
+
+    initChat();
+
+    return () => {
+      // Cleanup on unmount
+      if (roomId) {
+        ChatService.leaveRoom(roomId, user.id);
+      }
+    };
   }, [roomId, user, navigate]);
 
   if (!roomId || !otherUser) {
@@ -36,11 +58,11 @@ export default function Chat() {
         <div className="max-w-4xl mx-auto space-y-6">
           <Button
             variant="ghost"
-            onClick={() => navigate('/discover')}
+            onClick={() => navigate('/chats')}
             className="mb-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Discovery
+            Back to Chats
           </Button>
 
           <ChatWindow

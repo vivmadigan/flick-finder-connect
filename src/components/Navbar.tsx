@@ -30,6 +30,11 @@ export function Navbar() {
                   Discover
                 </Button>
               </Link>
+              <Link to="/chats">
+                <Button variant="ghost" size="sm">
+                  Chats
+                </Button>
+              </Link>
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
