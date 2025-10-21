@@ -56,7 +56,13 @@ export function Navbar() {
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="cursor-pointer">
                       <User className="w-4 h-4 mr-2" />
-                      Profile
+                      Preferences
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/account/me" className="cursor-pointer">
+                      <User className="w-4 h-4 mr-2" />
+                      My Information
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useVisualFX } from '@/context/VisualFXProvider';
-import { AuthForm } from '@/features/auth/AuthForm';
+import { SignInForm } from '@/features/auth/SignInForm';
 
 export default function Login() {
   const { setPreset } = useVisualFX();
@@ -12,7 +12,7 @@ export default function Login() {
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center px-4 py-20">
       <div className="relative z-10 w-full">
-        <AuthForm mode="login" />
+        <SignInForm />
       </div>
     </div>
   );
