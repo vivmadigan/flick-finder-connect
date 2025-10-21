@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@/types';
-import { AuthService } from '@/lib/services/AuthService';
+import { authService, isAuthenticated as checkAuth, clearToken } from '@/services/authService';
 
 interface AuthContextType {
   user: User | null;
@@ -21,11 +21,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Hydrate user on app start
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem('access_token');
-      
-      if (storedToken) {
+      if (checkAuth()) {
         try {
-          const userInfo = await AuthService.getMyInformation();
+          // TODO: In LIVE mode, this validates the token by calling /api/MyInformation
+          const userInfo = await authService.myInformation();
           
           const hydratedUser: User = {
             id: userInfo.userId,
@@ -35,12 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
           
           setUser(hydratedUser);
-          setToken(storedToken);
+          setToken(localStorage.getItem('access_token'));
         } catch (error) {
           console.error('Failed to hydrate user:', error);
           // Clear invalid token
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('cinematch_user');
+          clearToken();
         }
       }
       
@@ -58,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await AuthService.logout();
+    clearToken();
     setUser(null);
     setToken(null);
   };

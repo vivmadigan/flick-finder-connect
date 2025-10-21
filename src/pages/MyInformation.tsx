@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVisualFX } from '@/context/VisualFXProvider';
 import { useAuth } from '@/context/AuthContext';
-import { AuthService } from '@/lib/services/AuthService';
+import { authService, clearToken } from '@/services/authService';
+import type { MyInformationDto } from '@/types/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -10,19 +11,11 @@ import { Input } from '@/components/ui/input';
 import { ArrowLeft, Copy, LogOut, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-interface UserInfo {
-  userId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  displayName: string;
-}
-
 export default function MyInformation() {
   const navigate = useNavigate();
   const { setPreset } = useVisualFX();
   const { logout } = useAuth();
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
+  const [userInfo, setUserInfo] = useState<MyInformationDto | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,7 +23,8 @@ export default function MyInformation() {
     
     const fetchUserInfo = async () => {
       try {
-        const data = await AuthService.getMyInformation();
+        // TODO: In LIVE mode, this calls /api/MyInformation on the ASP.NET backend with Bearer token
+        const data = await authService.myInformation();
         setUserInfo(data);
       } catch (error) {
         console.error('Failed to fetch user info:', error);
@@ -51,6 +45,7 @@ export default function MyInformation() {
   };
 
   const handleLogout = async () => {
+    clearToken();
     await logout();
     toast.success('Logged out successfully');
     navigate('/login');

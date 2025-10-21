@@ -5,10 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
-import { AuthService } from '@/lib/services/AuthService';
+import { authService, saveToken } from '@/services/authService';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { AxiosError } from 'axios';
 
 export function SignUpForm() {
   const navigate = useNavigate();
@@ -58,35 +57,41 @@ export function SignUpForm() {
     setErrors({});
 
     try {
-      const response = await AuthService.signUp({
+      // TODO: In LIVE mode, this calls /api/SignUp on the ASP.NET backend
+      const response = await authService.signUp({
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
         displayName: formData.displayName,
       });
+
+      saveToken(response.token);
       
-      login(response.user, response.token);
+      const user = {
+        id: response.userId,
+        email: response.email,
+        displayName: response.displayName,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${response.email}`,
+      };
+
+      login(user, response.token);
       toast.success('Welcome to CineMatch!');
       navigate('/onboarding');
     } catch (error) {
-      const axiosError = error as AxiosError<any>;
+      const errorMessage = error instanceof Error ? error.message : 'Sign up failed';
       
-      if (axiosError.response?.status === 409) {
-        // Email or display name already taken
-        const message = axiosError.response.data?.message || axiosError.response.data;
-        if (typeof message === 'string') {
-          if (message.toLowerCase().includes('email')) {
-            setErrors({ email: 'Email is already in use' });
-          } else if (message.toLowerCase().includes('display')) {
-            setErrors({ displayName: 'Display name is already taken' });
-          }
+      // TODO: In LIVE mode, parse ASP.NET error responses (409 for conflicts, 400 for validation)
+      if (errorMessage.includes('409') || errorMessage.includes('already')) {
+        if (errorMessage.toLowerCase().includes('email')) {
+          setErrors({ email: 'Email is already in use' });
+        } else if (errorMessage.toLowerCase().includes('display')) {
+          setErrors({ displayName: 'Display name is already taken' });
+        } else {
+          toast.error('Email or display name already taken');
         }
-        toast.error('Registration failed. Please check the errors.');
-      } else if (axiosError.response?.status === 400) {
-        // Identity validation errors
-        const message = axiosError.response.data?.message || 'Invalid input. Please check your details.';
-        toast.error(message);
+      } else if (errorMessage.includes('400')) {
+        toast.error('Invalid input. Please check your details.');
       } else {
         toast.error('Registration failed. Please try again.');
       }

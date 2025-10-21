@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
+import { isAuthenticated } from '@/services/authService';
 import { ReactNode } from 'react';
 
 interface ProtectedRouteProps {
@@ -8,7 +9,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, loading } = useAuth();
+  const { loading } = useAuth();
   const { preferences } = usePreferences();
   const location = useLocation();
 
@@ -16,7 +17,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return null; // Or a loading spinner
   }
 
-  if (!isAuthenticated) {
+  // TODO: In LIVE mode, this checks for the Bearer token from ASP.NET backend
+  if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 

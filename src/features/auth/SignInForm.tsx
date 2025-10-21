@@ -5,10 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/context/AuthContext';
-import { AuthService } from '@/lib/services/AuthService';
+import { authService, saveToken } from '@/services/authService';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
-import { AxiosError } from 'axios';
 
 export function SignInForm() {
   const navigate = useNavigate();
@@ -24,20 +23,31 @@ export function SignInForm() {
     setLoading(true);
 
     try {
-      const response = await AuthService.signIn({
+      // TODO: In LIVE mode, this calls /api/SignIn on the ASP.NET backend
+      const response = await authService.signIn({
         email: formData.email,
         password: formData.password,
       });
+
+      saveToken(response.token);
       
-      login(response.user, response.token);
+      const user = {
+        id: response.userId,
+        email: response.email,
+        displayName: response.displayName,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${response.email}`,
+      };
+      
+      login(user, response.token);
       toast.success('Welcome back!');
       navigate('/discover');
     } catch (error) {
-      const axiosError = error as AxiosError<any>;
+      const errorMessage = error instanceof Error ? error.message : 'Sign in failed';
       
-      if (axiosError.response?.status === 401) {
+      // TODO: In LIVE mode, parse ASP.NET error responses (401 for invalid credentials)
+      if (errorMessage.includes('401')) {
         toast.error('Invalid email or password');
-      } else if (axiosError.response?.status === 400) {
+      } else if (errorMessage.includes('400')) {
         toast.error('Please check your email and password');
       } else {
         toast.error('Sign in failed. Please try again.');
