@@ -1,91 +1,88 @@
 import { ChatMessage, ChatRoom, Conversation, User } from '@/types';
 import { SignalRChatService } from './SignalRChatService';
+import { API_MODE } from '@/services/apiMode';
 import { toast } from 'sonner';
 
-// TODO: Replace with actual SignalR connection to your ASP.NET Web API
-// Set up SignalR hub connection:
-// - Hub URL: /api/chat
-// - Methods: SendMessage, ReceiveMessage, JoinRoom, LeaveRoom
-// - Authentication: Pass Bearer token in connection setup
+// ChatService: follows MOCK/LIVE pattern (like authService.ts)
+// MOCK mode: in-memory data with simulated delays
+// LIVE mode: SignalR connection to ASP.NET /chathub
 
-// In-memory store for mock data
+// In-memory store for MOCK mode
 const mockRooms = new Map<string, ChatRoom>();
 const mockMessages = new Map<string, ChatMessage[]>();
 
 let signalRService: SignalRChatService | null = null;
-let isSignalRMode = false;
 
 export class ChatService {
-  static async initializeSignalR(token?: string): Promise<void> {
+  // Initialize SignalR in LIVE mode only
+  static async initializeSignalR(): Promise<void> {
+    if (API_MODE === 'mock') {
+      console.log('[ChatService] MOCK mode - using in-memory data');
+      toast('Chat in mock mode', { 
+        description: 'Using local mock data. Set VITE_API_MODE=live to connect.',
+        duration: 3000 
+      });
+      return;
+    }
+
+    // TODO: LIVE mode - connect to ASP.NET /chathub
     if (!signalRService) {
       signalRService = new SignalRChatService();
-      const connected = await signalRService.connect(token);
+      const connected = await signalRService.connect();
       
       if (connected) {
-        isSignalRMode = true;
-        console.log('[ChatService] SignalR connected');
+        console.log('[ChatService] SignalR connected (LIVE mode)');
       } else {
-        isSignalRMode = false;
-        toast('Connected in mock mode', { 
-          description: 'SignalR not configured. Using local mock data.',
-          duration: 3000 
-        });
-        console.log('[ChatService] Using mock mode');
+        console.warn('[ChatService] SignalR connection failed, check token/backend');
       }
     }
   }
 
   static async listConversations(userId: string): Promise<Conversation[]> {
-    console.log('[MOCK] Listing conversations for user:', userId);
-    
-    // TODO: Replace with API call
-    // const response = await api.get(`/api/chat/conversations?userId=${userId}`);
-    // return response.data;
-    
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Mock: return empty array for now
-        resolve([]);
-      }, 300);
-    });
+    if (API_MODE === 'mock') {
+      console.log('[MOCK] Listing conversations');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return []; // Mock: empty for now
+    }
+
+    // TODO: LIVE mode - call GET /api/chats
+    // const response = await fetch(`${API_BASE}/api/chats`, {
+    //   headers: { Authorization: `Bearer ${localStorage.getItem(TOKEN_KEY)}` }
+    // });
+    // return response.json();
+    return [];
   }
 
   static async joinRoom(roomId: string, userId: string): Promise<ChatRoom> {
     console.log('[ChatService] Joining room:', { roomId, userId });
     
-    if (isSignalRMode && signalRService?.isConnected()) {
+    if (API_MODE === 'live' && signalRService?.isConnected()) {
+      // TODO: LIVE mode - invoke SignalR JoinRoom
       try {
         await signalRService.joinRoom(roomId);
-        console.log('[ChatService] Joined room via SignalR');
+        console.log('[ChatService] Joined room via SignalR (LIVE)');
       } catch (error) {
-        console.error('[ChatService] SignalR join failed, falling back to mock:', error);
+        console.error('[ChatService] SignalR join failed:', error);
+        throw error;
       }
     }
     
-    // TODO: Replace with SignalR hub connection
-    // await hubConnection.invoke('JoinRoom', roomId);
-    // const room = await api.get(`/api/chat/rooms/${roomId}`);
-    // return room.data;
+    // MOCK mode: create in-memory room
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const existingRoom = mockRooms.get(roomId);
+    if (existingRoom) {
+      return existingRoom;
+    }
     
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const existingRoom = mockRooms.get(roomId);
-        if (existingRoom) {
-          resolve(existingRoom);
-        } else {
-          // Create a mock room
-          const room: ChatRoom = {
-            id: roomId,
-            participants: [],
-            messages: [],
-            match: {} as any, // Would be populated from the match
-          };
-          mockRooms.set(roomId, room);
-          mockMessages.set(roomId, []);
-          resolve(room);
-        }
-      }, 300);
-    });
+    const room: ChatRoom = {
+      id: roomId,
+      participants: [],
+      messages: [],
+      match: {} as any,
+    };
+    mockRooms.set(roomId, room);
+    mockMessages.set(roomId, []);
+    return room;
   }
 
   static async sendMessage(
@@ -96,12 +93,12 @@ export class ChatService {
   ): Promise<ChatMessage> {
     console.log('[ChatService] Sending message:', { roomId, senderId, content });
     
-    if (isSignalRMode && signalRService?.isConnected()) {
+    if (API_MODE === 'live' && signalRService?.isConnected()) {
+      // TODO: LIVE mode - invoke SignalR SendMessage
       try {
         await signalRService.sendMessage(roomId, content);
-        console.log('[ChatService] Message sent via SignalR');
-        // SignalR will trigger ReceiveMessage event with the full message
-        // Return a placeholder that will be replaced by the real message from the hub
+        console.log('[ChatService] Message sent via SignalR (LIVE)');
+        // Return temp message; real one will come via ReceiveMessage event
         return {
           id: `temp-${Date.now()}`,
           roomId,
@@ -111,74 +108,67 @@ export class ChatService {
           timestamp: new Date(),
         };
       } catch (error) {
-        console.error('[ChatService] SignalR send failed, falling back to mock:', error);
+        console.error('[ChatService] SignalR send failed:', error);
+        throw error;
       }
     }
     
-    // TODO: Replace with SignalR hub invoke
-    // await hubConnection.invoke('SendMessage', roomId, content);
+    // MOCK mode: simulate delay and store message
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const message: ChatMessage = {
+      id: `msg-${Date.now()}`,
+      roomId,
+      senderId,
+      senderName,
+      content,
+      timestamp: new Date(),
+    };
     
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const message: ChatMessage = {
-          id: `msg-${Date.now()}`,
-          roomId,
-          senderId,
-          senderName,
-          content,
-          timestamp: new Date(),
-        };
-        
-        const messages = mockMessages.get(roomId) || [];
-        messages.push(message);
-        mockMessages.set(roomId, messages);
-        
-        resolve(message);
-      }, 200);
-    });
+    const messages = mockMessages.get(roomId) || [];
+    messages.push(message);
+    mockMessages.set(roomId, messages);
+    return message;
   }
 
   static async getMessages(roomId: string): Promise<ChatMessage[]> {
-    console.log('[MOCK] Getting messages for room:', roomId);
-    
-    // TODO: Replace with API call
-    // const response = await api.get(`/api/chat/rooms/${roomId}/messages`);
-    // return response.data;
-    
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const messages = mockMessages.get(roomId) || [];
-        resolve(messages);
-      }, 300);
-    });
+    if (API_MODE === 'mock') {
+      console.log('[MOCK] Getting messages for room:', roomId);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return mockMessages.get(roomId) || [];
+    }
+
+    // TODO: LIVE mode - call GET /api/chats/{roomId}/messages?take=50
+    // const token = localStorage.getItem(TOKEN_KEY);
+    // const response = await fetch(`${API_BASE}/api/chats/${roomId}/messages?take=50`, {
+    //   headers: { Authorization: `Bearer ${token}` }
+    // });
+    // return response.json();
+    return [];
   }
 
   static async leaveRoom(roomId: string, userId: string): Promise<void> {
     console.log('[ChatService] Leaving room:', { roomId, userId });
     
-    if (isSignalRMode && signalRService?.isConnected()) {
+    if (API_MODE === 'live' && signalRService?.isConnected()) {
+      // TODO: LIVE mode - invoke SignalR LeaveRoom + POST /api/chats/{roomId}/leave
       try {
         await signalRService.leaveRoom(roomId);
-        console.log('[ChatService] Left room via SignalR');
+        console.log('[ChatService] Left room via SignalR (LIVE)');
       } catch (error) {
         console.error('[ChatService] SignalR leave failed:', error);
       }
     }
     
-    // TODO: Replace with SignalR hub invoke
-    // await hubConnection.invoke('LeaveRoom', roomId);
-    
-    return Promise.resolve();
+    // MOCK mode: no-op
   }
 
   static onMessage(callback: (message: ChatMessage) => void): () => void {
-    console.log('[ChatService] Subscribing to messages');
-    
-    if (isSignalRMode && signalRService) {
+    if (API_MODE === 'live' && signalRService) {
+      // TODO: LIVE mode - subscribe to SignalR ReceiveMessage event
       return signalRService.onMessage(callback);
     }
     
-    // Mock: no-op for now
+    // MOCK mode: no real-time events
     return () => {};
   }
 
@@ -186,8 +176,7 @@ export class ChatService {
     if (signalRService) {
       await signalRService.disconnect();
       signalRService = null;
-      isSignalRMode = false;
-      console.log('[ChatService] Disconnected');
+      console.log('[ChatService] Disconnected (LIVE)');
     }
   }
 }

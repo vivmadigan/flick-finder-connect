@@ -1,27 +1,29 @@
 import * as signalR from '@microsoft/signalr';
 import { ChatMessage } from '@/types';
+import { API_BASE, TOKEN_KEY } from '@/services/apiMode';
 
-// TODO: Wire to your ASP.NET Web API SignalR Hub
-// Hub should expose methods: JoinRoom, SendMessage, LeaveRoom
-// Hub should call clients: ReceiveMessage
-// Authentication: Pass Bearer token in connection setup
+// SignalR connection to ASP.NET Web API /chathub
+// Hub methods: JoinRoom(roomId), SendMessage(roomId, content), LeaveRoom(roomId)
+// Hub client events: ReceiveMessage(message)
+// Authentication: JWT via accessTokenFactory
 
 export class SignalRChatService {
   private connection: signalR.HubConnection | null = null;
   private messageCallbacks: ((message: ChatMessage) => void)[] = [];
   
-  async connect(token?: string): Promise<boolean> {
-    const hubUrl = import.meta.env.VITE_SIGNALR_URL;
+  async connect(): Promise<boolean> {
+    const hubUrl = `${API_BASE}/chathub`;
+    const token = localStorage.getItem(TOKEN_KEY) || '';
     
-    if (!hubUrl) {
-      console.warn('[SignalR] No VITE_SIGNALR_URL configured, using mock mode');
+    if (!token) {
+      console.warn('[SignalR] No access token found, cannot connect');
       return false;
     }
 
     try {
       this.connection = new signalR.HubConnectionBuilder()
         .withUrl(hubUrl, {
-          accessTokenFactory: () => token || '',
+          accessTokenFactory: () => token,
         })
         .withAutomaticReconnect({
           nextRetryDelayInMilliseconds: (retryContext) => {

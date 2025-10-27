@@ -7,6 +7,7 @@ import { ChatWindow } from '@/features/chat/ChatWindow';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { User } from '@/types';
+import { TOKEN_KEY } from '@/services/apiMode';
 
 export default function Chat() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -27,12 +28,10 @@ export default function Chat() {
       return;
     }
 
-    // Initialize SignalR connection
+    // Initialize chat (SignalR in LIVE mode, mock in MOCK mode)
     const initChat = async () => {
       try {
-        // Get auth token from context if available
-        const token = localStorage.getItem('cinematch_token');
-        await ChatService.initializeSignalR(token || undefined);
+        await ChatService.initializeSignalR();
       } catch (error) {
         console.error('Failed to initialize chat:', error);
       }
