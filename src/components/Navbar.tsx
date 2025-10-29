@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { User, LogOut } from 'lucide-react';
+import { User, LogOut, Heart } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +30,12 @@ export function Navbar() {
                   Discover
                 </Button>
               </Link>
+              <Link to="/liked-movies">
+                <Button variant="ghost" size="sm">
+                  <Heart className="w-4 h-4 mr-2" />
+                  Liked Movies
+                </Button>
+              </Link>
               <Link to="/chats">
                 <Button variant="ghost" size="sm">
                   Chats
@@ -53,6 +59,12 @@ export function Navbar() {
                     <p className="text-xs text-muted-foreground">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/liked-movies" className="cursor-pointer">
+                      <Heart className="w-4 h-4 mr-2" />
+                      Liked Movies
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link to="/profile" className="cursor-pointer">
                       <User className="w-4 h-4 mr-2" />

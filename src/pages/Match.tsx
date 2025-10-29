@@ -44,9 +44,18 @@ export default function Match() {
     
     setLoading(true);
     try {
-      // Load all movies to pass to match service
-      const movies = await MoviesService.getMovies(undefined, undefined, 0, 100);
+      console.log('[Match] Finding matches with preferences:', preferences);
+      
+      // Load all movies to pass to match service - preserve user's preferences
+      const movies = await MoviesService.getMovies(
+        preferences.genre,
+        preferences.lengthBucket,
+        0,
+        100
+      );
       setAllMovies(movies);
+      
+      console.log('[Match] Loaded movies for matching:', movies.length);
       
       const foundMatches = await MatchService.findMatches(
         user.id,
@@ -55,11 +64,13 @@ export default function Match() {
         movies
       );
       
+      console.log('[Match] Found matches:', foundMatches.length);
       setMatches(foundMatches);
       
       if (foundMatches.length === 0) {
-        toast.info('No matches found. Try liking more movies!');
-        setTimeout(() => navigate('/discover'), 2000);
+        toast.info('No matches yet! Your likes are saved. Come back later when more users join.');
+      } else {
+        toast.success(`Found ${foundMatches.length} potential matches!`);
       }
     } catch (error) {
       toast.error('Failed to find matches');

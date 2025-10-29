@@ -1,5 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Preferences } from '@/types';
+import { PreferencesService } from '@/lib/services/PreferencesService';
+import { API_MODE } from '@/services/apiMode';
+import { useAuth } from './AuthContext';
 
 interface PreferencesContextType {
   preferences: Preferences;
@@ -39,12 +42,39 @@ function saveToStorage<T>(key: string, value: T): void {
 }
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(user?.id || null);
   const [preferences, setPreferences] = useState<Preferences>(() =>
     loadFromStorage(STORAGE_KEYS.PREFERENCES, initialPreferences)
   );
   const [likedMovieIds, setLikedMovieIds] = useState<string[]>(() =>
     loadFromStorage(STORAGE_KEYS.LIKED_MOVIES, [])
   );
+
+  // Reset preferences when user changes (logout/login with different user)
+  useEffect(() => {
+    if (user?.id !== currentUserId) {
+      console.log('[PreferencesContext] User changed, resetting preferences', {
+        previousUser: currentUserId,
+        newUser: user?.id,
+      });
+      setCurrentUserId(user?.id || null);
+      
+      if (!user) {
+        // User logged out, clear everything
+        setPreferences(initialPreferences);
+        setLikedMovieIds([]);
+        localStorage.removeItem(STORAGE_KEYS.PREFERENCES);
+        localStorage.removeItem(STORAGE_KEYS.LIKED_MOVIES);
+      } else {
+        // Different user logged in, load their data from localStorage
+        // (which should be empty after SignInForm clears it)
+        setPreferences(loadFromStorage(STORAGE_KEYS.PREFERENCES, initialPreferences));
+        setLikedMovieIds(loadFromStorage(STORAGE_KEYS.LIKED_MOVIES, []));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   useEffect(() => {
     saveToStorage(STORAGE_KEYS.PREFERENCES, preferences);
@@ -54,8 +84,18 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     saveToStorage(STORAGE_KEYS.LIKED_MOVIES, likedMovieIds);
   }, [likedMovieIds]);
 
-  const updatePreferences = (prefs: Partial<Preferences>) => {
-    setPreferences((prev) => ({ ...prev, ...prefs }));
+  const updatePreferences = async (prefs: Partial<Preferences>) => {
+    const newPrefs = { ...preferences, ...prefs };
+    setPreferences(newPrefs);
+    
+    // Sync to backend in live mode
+    if (API_MODE === 'live' && (newPrefs.genre || newPrefs.lengthBucket)) {
+      try {
+        await PreferencesService.savePreferences(newPrefs);
+      } catch (error) {
+        console.error('Failed to sync preferences to backend:', error);
+      }
+    }
   };
 
   const addLikedMovie = (movieId: string) => {

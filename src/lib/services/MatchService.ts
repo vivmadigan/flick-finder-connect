@@ -1,10 +1,10 @@
 import { Match, Movie, User, Preferences } from '@/types';
+import { api } from '@/lib/api';
+import { API_MODE } from '@/services/apiMode';
 
-// TODO: Replace with actual API calls to your ASP.NET Web API
-// Endpoints:
-// - POST /api/matches/find - { userId, likedMovieIds, preferences }
-// - POST /api/matches/respond - { matchId, userId, accepted: boolean }
-// - GET /api/matches/{userId} - get all matches for a user
+// MatchService: MOCK/LIVE pattern
+// MOCK mode: uses in-memory mock data
+// LIVE mode: calls ASP.NET backend endpoints
 
 const MOCK_USERS: User[] = [
   {
@@ -46,22 +46,28 @@ export class MatchService {
     preferences: Preferences,
     allMovies: Movie[]
   ): Promise<Match[]> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Finding matches from backend:', { userId, likedMovieIds, preferences });
+      try {
+        // Your backend uses /api/Matches/candidates
+        const response = await api.get('/api/Matches/candidates');
+        return response.data;
+      } catch (error) {
+        console.error('[LIVE] Failed to find matches:', error);
+        throw error;
+      }
+    }
+    
+    // MOCK mode
     console.log('[MOCK] Finding matches:', { userId, likedMovieIds, preferences });
-    
-    // TODO: Replace with actual API call and server-side matching logic
-    // const response = await api.post('/api/matches/find', { userId, likedMovieIds, preferences });
-    // return response.data;
-    
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Simple client-side mock: create 2-3 matches with random users
         const matches: Match[] = [];
         const numMatches = Math.min(3, MOCK_USERS.length);
         
         for (let i = 0; i < numMatches; i++) {
           const mockUser = MOCK_USERS[i];
           
-          // Pick 1-2 random liked movies as "shared"
           const numShared = Math.min(2, likedMovieIds.length);
           const sharedMovieIds = likedMovieIds
             .sort(() => Math.random() - 0.5)
@@ -92,16 +98,27 @@ export class MatchService {
     userId: string,
     accepted: boolean
   ): Promise<{ roomId?: string; bothAccepted: boolean }> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Responding to match from backend:', { matchId, userId, accepted });
+      try {
+        // Your backend uses /api/Matches/request with movieId
+        // This might need adjustment based on your actual backend implementation
+        const response = await api.post('/api/Matches/request', { 
+          matchId, 
+          accepted 
+        });
+        return response.data;
+      } catch (error) {
+        console.error('[LIVE] Failed to respond to match:', error);
+        throw error;
+      }
+    }
+    
+    // MOCK mode
     console.log('[MOCK] Responding to match:', { matchId, userId, accepted });
-    
-    // TODO: Replace with actual API call
-    // const response = await api.post('/api/matches/respond', { matchId, userId, accepted });
-    // return response.data;
-    
     return new Promise((resolve) => {
       setTimeout(() => {
         if (accepted) {
-          // Mock: assume other side also accepted
           const roomId = `room-${Date.now()}`;
           resolve({ roomId, bothAccepted: true });
         } else {

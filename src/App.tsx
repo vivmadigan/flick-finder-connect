@@ -17,6 +17,7 @@ import Chats from "./pages/Chats";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import MyInformation from "./pages/MyInformation";
+import LikedMovies from "./pages/LikedMovies";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
                   <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                   <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/match" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+                  <Route path="/liked-movies" element={<ProtectedRoute><LikedMovies /></ProtectedRoute>} />
                   <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                   <Route path="/chat/:roomId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
                   <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

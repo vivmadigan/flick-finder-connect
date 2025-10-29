@@ -1,11 +1,10 @@
 import { Movie, Genre, LengthBucket } from '@/types';
+import { api } from '@/lib/api';
+import { API_MODE } from '@/services/apiMode';
 
-// TODO: Replace with actual API calls to your ASP.NET Web API
-// Endpoints:
-// - GET /api/movies?genre={genre}&lengthBucket={lengthBucket}&skip={skip}&take={take}
-// - GET /api/movies/{id}
-// - POST /api/movies/like - { userId, movieId }
-// - POST /api/movies/skip - { userId, movieId }
+// MoviesService: MOCK/LIVE pattern
+// MOCK mode: uses in-memory mock data
+// LIVE mode: calls ASP.NET backend endpoints
 
 const MOCK_MOVIES: Movie[] = [
   // Action
@@ -101,6 +100,57 @@ const MOCK_MOVIES: Movie[] = [
   { id: '60', title: 'Amélie', year: 2001, runtime: 122, poster: 'https://image.tmdb.org/t/p/w500/nSxDa3M9aMvGVLoItzWTepQ5h5d.jpg', genres: ['Romance', 'Comedy', 'Feel-good'], lengthBucket: 'medium', rating: 8.3, synopsis: 'A shy waitress decides to change the lives of those around her.' },
 ];
 
+// Backend movie response interface
+interface BackendMovie {
+  id: string;
+  title: string;
+  titleEn?: string;
+  overview: string;
+  posterUrl: string;
+  backdropUrl?: string;
+  releaseYear: string;
+  rating: string;
+  tmdbUrl?: string;
+  runtime?: number;
+}
+
+// Transform backend movie format to frontend Movie type
+function transformBackendMovie(backendMovie: BackendMovie, requestedGenre?: Genre, requestedLength?: LengthBucket): Movie {
+  return {
+    id: backendMovie.id,
+    title: backendMovie.title,
+    year: parseInt(backendMovie.releaseYear) || 0,
+    runtime: backendMovie.runtime || 120, // Default if not provided
+    poster: backendMovie.posterUrl,
+    genres: requestedGenre ? [requestedGenre] : [],  // Use the genre that was searched for
+    lengthBucket: requestedLength || 'medium',  // Use the length that was searched for
+    rating: parseFloat(backendMovie.rating) || undefined,
+    synopsis: backendMovie.overview || ''
+  };
+}
+
+// Genre name to TMDB ID mapping (based on TMDB API)
+const GENRE_NAME_TO_ID: Record<string, string> = {
+  'Action': '28',
+  'Comedy': '35',
+  'Drama': '18',
+  'Romance': '10749',
+  'Thriller': '53',
+  'Sci-Fi': '878',
+  'Fantasy': '14',
+  'Horror': '27',
+  'Western': '37',
+  'Crime': '80',
+  'Animated': '16',
+  'Documentary': '99',
+  'Adventure': '12',
+  'Mystery': '9648',
+  'War': '10752',
+  'Music': '10402',
+  'Family': '10751',
+  'History': '36',
+};
+
 export class MoviesService {
   static async getMovies(
     genre?: Genre,
@@ -108,12 +158,78 @@ export class MoviesService {
     skip: number = 0,
     take: number = 10
   ): Promise<Movie[]> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Fetching movies from backend:', { genre, lengthBucket, skip, take });
+      try {
+        // Convert frontend parameters to backend format
+        const params: Record<string, string | number> = {};
+        
+        // Convert genre name to TMDB genre ID
+        if (genre) {
+          const genreId = GENRE_NAME_TO_ID[genre];
+          if (genreId) {
+            params.genres = genreId;
+            console.log('[LIVE] Mapped genre:', genre, '→', genreId);
+          } else {
+            console.warn('[LIVE] Unknown genre:', genre, '- sending as-is');
+            params.genres = genre;
+          }
+        }
+        
+        // Backend uses "length" not "lengthBucket"
+        if (lengthBucket) {
+          params.length = lengthBucket;
+        }
+        
+        // Backend uses "page" and "batchSize" instead of "skip" and "take"
+        // Convert skip/take to page number
+        const page = Math.floor(skip / take) + 1;
+        params.page = page;
+        params.batchSize = take;
+        
+        console.log('[LIVE] Request params:', params);
+        console.log('[LIVE] Request URL:', '/api/Movies/discover');
+        
+        const response = await api.get('/api/Movies/discover', { params });
+        
+        console.log('[LIVE] Response status:', response.status);
+        console.log('[LIVE] Raw response from backend:', response.data);
+        console.log('[LIVE] Response type:', typeof response.data, 'Is array:', Array.isArray(response.data));
+        
+        if (!response.data || !Array.isArray(response.data)) {
+          console.warn('[LIVE] Invalid response format');
+          return [];
+        }
+        
+        console.log('[LIVE] Number of movies from backend:', response.data.length);
+        if (response.data.length > 0) {
+          console.log('[LIVE] First movie sample (raw):', response.data[0]);
+        }
+        
+        // Transform backend movies to frontend format
+        const transformedMovies = response.data.map((backendMovie: BackendMovie) => 
+          transformBackendMovie(backendMovie, genre, lengthBucket)
+        );
+        
+        console.log('[LIVE] Transformed movies count:', transformedMovies.length);
+        if (transformedMovies.length > 0) {
+          console.log('[LIVE] First movie sample (transformed):', transformedMovies[0]);
+        }
+        
+        return transformedMovies;
+      } catch (error) {
+        console.error('[LIVE] Failed to fetch movies - FULL ERROR:', error);
+        if (error && typeof error === 'object' && 'response' in error) {
+          const axiosError = error as { response?: { status: number; data: unknown } };
+          console.error('[LIVE] Error status:', axiosError.response?.status);
+          console.error('[LIVE] Error data:', axiosError.response?.data);
+        }
+        throw error;
+      }
+    }
+    
+    // MOCK mode
     console.log('[MOCK] Fetching movies:', { genre, lengthBucket, skip, take });
-    
-    // TODO: Replace with actual API call
-    // const response = await api.get('/api/movies', { params: { genre, lengthBucket, skip, take } });
-    // return response.data;
-    
     return new Promise((resolve) => {
       setTimeout(() => {
         let filtered = MOCK_MOVIES;
@@ -132,21 +248,89 @@ export class MoviesService {
     });
   }
 
-  static async likeMovie(userId: string, movieId: string): Promise<void> {
+  static async likeMovie(userId: string, movieId: string, movieData?: { title: string; poster: string; year: number }): Promise<void> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Liking movie:', { userId, movieId, movieData });
+      try {
+        // Your backend uses /api/Movies/{tmdbId}/like
+        // According to Swagger, it expects optional movie snapshot info
+        const body = movieData ? {
+          title: movieData.title,
+          posterPath: movieData.poster,
+          releaseYear: movieData.year.toString()
+        } : {
+          title: '',
+          posterPath: '',
+          releaseYear: ''
+        };
+        
+        console.log('[LIVE] Sending like request with body:', body);
+        await api.post(`/api/Movies/${movieId}/like`, body);
+        console.log('[LIVE] Movie liked successfully');
+      } catch (error) {
+        console.error('[LIVE] Failed to like movie:', error);
+        throw error;
+      }
+      return;
+    }
+    
+    // MOCK mode
     console.log('[MOCK] Liking movie:', { userId, movieId });
-    
-    // TODO: Replace with actual API call
-    // await api.post('/api/movies/like', { userId, movieId });
-    
     return Promise.resolve();
   }
 
   static async skipMovie(userId: string, movieId: string): Promise<void> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Skipping movie:', { userId, movieId });
+      // TODO: Implement skip endpoint on backend if needed
+      // For now, we just log it - skips might not need to be persisted
+      return Promise.resolve();
+    }
+    
+    // MOCK mode
     console.log('[MOCK] Skipping movie:', { userId, movieId });
-    
-    // TODO: Replace with actual API call
-    // await api.post('/api/movies/skip', { userId, movieId });
-    
     return Promise.resolve();
+  }
+
+  static async getLikedMovies(): Promise<Movie[]> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Fetching liked movies from backend');
+      try {
+        const response = await api.get('/api/Movies/likes');
+        console.log('[LIVE] Received liked movies:', response.data);
+        
+        // Transform backend format to frontend Movie format
+        interface BackendLikedMovie {
+          tmdbId: number;
+          title: string;
+          posterPath: string;
+          releaseYear: string;
+          oneLiner?: string;
+          likedAt?: string;
+        }
+        
+        const likedMovies = (response.data as BackendLikedMovie[]).map((movie) => ({
+          id: movie.tmdbId.toString(),
+          title: movie.title,
+          year: parseInt(movie.releaseYear || '0'),
+          runtime: 120, // Backend doesn't store runtime, use default
+          poster: movie.posterPath,
+          genres: [], // Backend doesn't return genres in likes endpoint
+          lengthBucket: 'medium' as LengthBucket, // Default
+          rating: 0, // Backend doesn't store rating
+          synopsis: movie.oneLiner || '', // Use oneLiner if available
+        }));
+        
+        console.log('[LIVE] Transformed liked movies:', likedMovies.length);
+        return likedMovies;
+      } catch (error) {
+        console.error('[LIVE] Failed to fetch liked movies:', error);
+        throw error;
+      }
+    }
+    
+    // MOCK mode - return a few sample liked movies
+    console.log('[MOCK] Fetching liked movies');
+    return Promise.resolve(MOCK_MOVIES.slice(0, 3));
   }
 }

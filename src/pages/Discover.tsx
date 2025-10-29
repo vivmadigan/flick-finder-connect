@@ -35,22 +35,39 @@ export default function Discover() {
   const [showDecisionPrompt, setShowDecisionPrompt] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
 
+  console.log('[Discover] Component mounted/rendered');
+  console.log('[Discover] User:', user);
+  console.log('[Discover] Preferences:', preferences);
+  console.log('[Discover] Movies count:', movies.length);
+  console.log('[Discover] Loading:', loading);
+
   useEffect(() => {
+    console.log('[Discover] Setting visual preset...');
     setPreset('dense');
   }, [setPreset]);
 
   useEffect(() => {
+    console.log('[Discover] Checking preferences for redirect...');
+    console.log('[Discover] Genre:', preferences.genre, 'LengthBucket:', preferences.lengthBucket);
     if (!preferences.genre || !preferences.lengthBucket) {
+      console.log('[Discover] Missing preferences, redirecting to onboarding');
       toast.error('Please complete onboarding first');
       navigate('/onboarding');
+    } else {
+      console.log('[Discover] Preferences OK, staying on discover page');
     }
   }, [preferences, navigate]);
 
   useEffect(() => {
+    console.log('[Discover] Preferences changed, checking if should load movies...');
+    console.log('[Discover] Genre:', preferences.genre, 'LengthBucket:', preferences.lengthBucket);
     if (preferences.genre && preferences.lengthBucket) {
+      console.log('[Discover] Calling loadInitialMovies...');
       loadInitialMovies();
+    } else {
+      console.log('[Discover] Skipping loadInitialMovies - missing preferences');
     }
-  }, [preferences]);
+  }, [preferences.genre, preferences.lengthBucket]);
 
   // Load from localStorage
   useEffect(() => {
@@ -80,17 +97,44 @@ export default function Discover() {
   }, [decisionCount]);
 
   const loadInitialMovies = async () => {
+    console.log('[Discover] Starting loadInitialMovies...');
+    console.log('[Discover] Current preferences:', preferences);
+    
+    if (!preferences.genre || !preferences.lengthBucket) {
+      console.error('[Discover] Missing preferences!', preferences);
+      toast.error('Missing preferences. Redirecting to onboarding...');
+      navigate('/onboarding');
+      return;
+    }
+    
     setLoading(true);
     try {
+      console.log('[Discover] Loading movies with:', { 
+        genre: preferences.genre, 
+        lengthBucket: preferences.lengthBucket 
+      });
+      
       const allMovies = await MoviesService.getMovies(
         preferences.genre,
         preferences.lengthBucket,
         0,
         100
       );
+      
+      console.log('[Discover] Loaded movies:', allMovies);
+      console.log('[Discover] Movies count:', allMovies.length);
+      console.log('[Discover] Movies array:', Array.isArray(allMovies));
+      
       setMovies(allMovies);
+      
+      if (allMovies.length === 0) {
+        toast.info('No movies found for your preferences. Try different filters.');
+      } else {
+        toast.success(`Loaded ${allMovies.length} movies!`);
+      }
     } catch (error) {
-      toast.error('Failed to load movies');
+      console.error('[Discover] Failed to load movies:', error);
+      toast.error('Failed to load movies. Check console for details.');
     } finally {
       setLoading(false);
     }
@@ -123,11 +167,17 @@ export default function Discover() {
     
     try {
       if (action === 'like') {
-        await MoviesService.likeMovie(user.id, movie.id);
+        console.log('[Discover] Liking movie:', movie);
+        await MoviesService.likeMovie(user.id, movie.id, {
+          title: movie.title,
+          poster: movie.poster,
+          year: movie.year
+        });
         addLikedMovie(movie.id);
         toast.success(`Want to watch ${movie.title}`);
         console.log('[Analytics] Like', { movieId: movie.id, title: movie.title });
       } else {
+        console.log('[Discover] Skipping movie:', movie);
         await MoviesService.skipMovie(user.id, movie.id);
         console.log('[Analytics] Skip', { movieId: movie.id, title: movie.title });
       }
@@ -260,8 +310,21 @@ export default function Discover() {
             </AnimatePresence>
           )}
 
-          <div className="text-center text-sm text-muted-foreground">
-            <p>Keyboard: <kbd className="px-2 py-1 bg-muted rounded">Enter</kbd> or <kbd className="px-2 py-1 bg-muted rounded">Space</kbd> to like · <kbd className="px-2 py-1 bg-muted rounded">S</kbd> to skip</p>
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Keyboard: <kbd className="px-2 py-1 bg-muted rounded">Enter</kbd> or <kbd className="px-2 py-1 bg-muted rounded">Space</kbd> to like · <kbd className="px-2 py-1 bg-muted rounded">S</kbd> to skip
+            </p>
+            {likedMovieIds.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                You've liked {likedMovieIds.length} movie{likedMovieIds.length === 1 ? '' : 's'} · 
+                <button 
+                  onClick={() => navigate('/liked-movies')} 
+                  className="ml-1 underline hover:text-primary transition-colors"
+                >
+                  View all
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </div>

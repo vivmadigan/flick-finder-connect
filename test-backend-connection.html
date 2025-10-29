@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backend Connection Test</title>
+</head>
+<body>
+    <h1>CineMatch Backend Connection Test</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function testConnection() {
+            const resultEl = document.getElementById('result');
+            const backendUrl = 'https://localhost:7119';
+            
+            resultEl.textContent = `Testing connection to ${backendUrl}...\n\n`;
+            
+            // Test 1: Root endpoint
+            resultEl.textContent += '1️⃣ Testing root endpoint...\n';
+            try {
+                const response = await fetch(backendUrl, {
+                    method: 'GET',
+                    mode: 'cors'
+                });
+                resultEl.textContent += `   Status: ${response.status}\n`;
+                resultEl.textContent += `   ✅ Root accessible\n\n`;
+            } catch (error) {
+                resultEl.textContent += `   ❌ Error: ${error.message}\n\n`;
+            }
+            
+            // Test 2: Try SignUp endpoint (POST)
+            resultEl.textContent += '2️⃣ Testing /api/SignUp endpoint...\n';
+            try {
+                const response = await fetch(`${backendUrl}/api/SignUp`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        password: 'Test123!',
+                        displayName: 'TestUser'
+                    })
+                });
+                resultEl.textContent += `   Status: ${response.status}\n`;
+                if (response.status === 400 || response.status === 409 || response.ok) {
+                    resultEl.textContent += `   ✅ Endpoint accessible (even if request invalid)\n\n`;
+                } else {
+                    const text = await response.text();
+                    resultEl.textContent += `   Response: ${text}\n\n`;
+                }
+            } catch (error) {
+                resultEl.textContent += `   ❌ Error: ${error.message}\n\n`;
+            }
+            
+            // Test 3: Try SignIn endpoint (POST)
+            resultEl.textContent += '3️⃣ Testing /api/SignIn endpoint...\n';
+            try {
+                const response = await fetch(`${backendUrl}/api/SignIn`, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@test.com',
+                        password: 'Test123!'
+                    })
+                });
+                resultEl.textContent += `   Status: ${response.status}\n`;
+                if (response.status === 401 || response.status === 400 || response.ok) {
+                    resultEl.textContent += `   ✅ Endpoint accessible (even if credentials invalid)\n\n`;
+                } else {
+                    const text = await response.text();
+                    resultEl.textContent += `   Response: ${text}\n\n`;
+                }
+            } catch (error) {
+                resultEl.textContent += `   ❌ Error: ${error.message}\n\n`;
+            }
+            
+            // Final diagnosis
+            resultEl.textContent += '\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+            resultEl.textContent += '📋 DIAGNOSIS:\n\n';
+            
+            if (resultEl.textContent.includes('✅')) {
+                resultEl.textContent += '✅ Backend is accessible!\n';
+                resultEl.textContent += '✅ Some endpoints are working!\n\n';
+                resultEl.textContent += '🎯 Next steps:\n';
+                resultEl.textContent += '1. Try signing up/in through your React app\n';
+                resultEl.textContent += '2. Check browser console for any errors\n';
+            } else {
+                resultEl.textContent += '❌ Cannot connect to backend\n\n';
+                resultEl.textContent += '🔧 TO FIX - Add CORS to your backend:\n\n';
+                resultEl.textContent += 'In your Program.cs (or Startup.cs), add:\n\n';
+                resultEl.textContent += 'builder.Services.AddCors(options =>\n';
+                resultEl.textContent += '{\n';
+                resultEl.textContent += '    options.AddPolicy("AllowFrontend", policy =>\n';
+                resultEl.textContent += '    {\n';
+                resultEl.textContent += '        policy.WithOrigins(\n';
+                resultEl.textContent += '            "https://localhost:5173",\n';
+                resultEl.textContent += '            "http://localhost:5173",\n';
+                resultEl.textContent += '            "file://" // for this test file\n';
+                resultEl.textContent += '        )\n';
+                resultEl.textContent += '        .AllowAnyHeader()\n';
+                resultEl.textContent += '        .AllowAnyMethod()\n';
+                resultEl.textContent += '        .AllowCredentials();\n';
+                resultEl.textContent += '    });\n';
+                resultEl.textContent += '});\n\n';
+                resultEl.textContent += '// Then BEFORE app.UseAuthorization():\n';
+                resultEl.textContent += 'app.UseCors("AllowFrontend");\n';
+            }
+        }
+    </script>
+</body>
+</html>
