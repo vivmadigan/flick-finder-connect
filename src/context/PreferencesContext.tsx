@@ -3,6 +3,7 @@ import { Preferences } from '@/types';
 import { PreferencesService } from '@/lib/services/PreferencesService';
 import { API_MODE } from '@/services/apiMode';
 import { useAuth } from './AuthContext';
+import { Logger } from '@/lib/logger';
 
 interface PreferencesContextType {
   preferences: Preferences;
@@ -88,21 +89,31 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     const newPrefs = { ...preferences, ...prefs };
     setPreferences(newPrefs);
     
+    Logger.action('Preferences updated', {
+      genre: newPrefs.genre,
+      lengthBucket: newPrefs.lengthBucket
+    });
+    
     // Sync to backend in live mode
     if (API_MODE === 'live' && (newPrefs.genre || newPrefs.lengthBucket)) {
       try {
         await PreferencesService.savePreferences(newPrefs);
+        Logger.api('POST', '/api/UserPreferences', { success: true });
       } catch (error) {
-        console.error('Failed to sync preferences to backend:', error);
+        Logger.error('Failed to sync preferences to backend', error);
       }
     }
   };
 
   const addLikedMovie = (movieId: string) => {
+    if (!likedMovieIds.includes(movieId)) {
+      Logger.action('Movie liked (added to local state)', { movieId });
+    }
     setLikedMovieIds((prev) => (prev.includes(movieId) ? prev : [...prev, movieId]));
   };
 
   const resetPreferences = () => {
+    Logger.action('Preferences reset');
     setPreferences(initialPreferences);
     setLikedMovieIds([]);
     localStorage.removeItem(STORAGE_KEYS.PREFERENCES);

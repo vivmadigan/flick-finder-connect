@@ -5,11 +5,13 @@ import { usePreferences } from '@/context/PreferencesContext';
 import { useVisualFX } from '@/context/VisualFXProvider';
 import { Movie } from '@/types';
 import { MoviesService } from '@/lib/services/MoviesService';
+import { PreferencesService } from '@/lib/services/PreferencesService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Heart, ArrowLeft, Film, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { MovieDetailModal } from '@/components/ui/MovieDetailModal';
 
 export default function LikedMovies() {
   const navigate = useNavigate();
@@ -19,6 +21,8 @@ export default function LikedMovies() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [showResetModal, setShowResetModal] = useState(false);
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [showMovieDetail, setShowMovieDetail] = useState(false);
 
   useEffect(() => {
     setPreset('standard');
@@ -47,10 +51,34 @@ export default function LikedMovies() {
     }
   };
 
-  const handleReset = () => {
-    resetPreferences();
-    toast.success('Preferences reset! Choose your genre and length again.');
-    navigate('/onboarding');
+  const handleReset = async () => {
+    try {
+      // Delete from backend API
+      await PreferencesService.deletePreferences();
+      // Clear local state
+      resetPreferences();
+      toast.success('Preferences reset! Choose your genre and length again.');
+      navigate('/onboarding');
+    } catch (error) {
+      console.error('[LikedMovies] Failed to reset preferences:', error);
+      toast.error('Failed to reset preferences. Please try again.');
+    }
+  };
+
+  const handleUnlikeMovie = async (movieId: string) => {
+    if (!user) return;
+    
+    try {
+      await MoviesService.unlikeMovie(user.id, movieId);
+      // Remove from local state
+      setMovies(prev => prev.filter(m => m.id !== movieId));
+      toast.success('Movie unliked');
+      // Reload the list to stay in sync
+      loadLikedMovies();
+    } catch (error) {
+      console.error('[LikedMovies] Failed to unlike movie:', error);
+      toast.error('Failed to unlike movie');
+    }
   };
 
   const handleContinueDiscover = () => {
@@ -100,42 +128,63 @@ export default function LikedMovies() {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <Card className="border-border/50 bg-card/50">
-              <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-                  <div className="space-y-1 text-center sm:text-left">
-                    <h3 className="font-semibold">What would you like to do?</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {preferences.genre && preferences.lengthBucket 
-                        ? `Continue with ${preferences.genre} · ${preferences.lengthBucket} length, or choose new preferences`
-                        : 'Set your preferences to start discovering movies, or browse your liked movies'
-                      }
-                    </p>
+            {/* Action Buttons - Banner as per spec */}
+            {preferences.genre && preferences.lengthBucket && (
+              <Card className="border-border/50 bg-card/50">
+                <CardContent className="p-6">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div className="space-y-1 text-center sm:text-left">
+                      <p className="text-base">
+                        Your current movie preference is <span className="font-semibold">{preferences.genre}</span>, length <span className="font-semibold">{preferences.lengthBucket}</span>. Continue with these preferences or reset and pick something new?
+                      </p>
+                    </div>
+                    <div className="flex gap-3 flex-shrink-0">
+                      <Button 
+                        onClick={handleContinueDiscover} 
+                        size="lg" 
+                        className="gap-2"
+                      >
+                        <Film className="w-4 h-4" />
+                        Continue
+                      </Button>
+                      <Button 
+                        onClick={() => setShowResetModal(true)} 
+                        variant="outline" 
+                        size="lg" 
+                        className="gap-2"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Reset
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-3 flex-shrink-0">
+                </CardContent>
+              </Card>
+            )}
+
+            {/* No preferences - show onboarding prompt */}
+            {(!preferences.genre || !preferences.lengthBucket) && (
+              <Card className="border-border/50 bg-card/50">
+                <CardContent className="p-6">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+                    <div className="space-y-1 text-center sm:text-left">
+                      <h3 className="font-semibold">Set your preferences</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Choose your preferred genre and movie length to start discovering
+                      </p>
+                    </div>
                     <Button 
-                      onClick={handleContinueDiscover} 
+                      onClick={() => navigate('/onboarding')} 
                       size="lg" 
                       className="gap-2"
-                      disabled={!preferences.genre || !preferences.lengthBucket}
                     >
                       <Film className="w-4 h-4" />
-                      {preferences.genre && preferences.lengthBucket ? 'Continue Discovering' : 'Set Preferences First'}
-                    </Button>
-                    <Button 
-                      onClick={() => setShowResetModal(true)} 
-                      variant="outline" 
-                      size="lg" 
-                      className="gap-2"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                      {preferences.genre && preferences.lengthBucket ? 'Reset Preferences' : 'Choose New Preferences'}
+                      Go to Onboarding
                     </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Movies Grid */}
@@ -161,8 +210,8 @@ export default function LikedMovies() {
                   key={movie.id} 
                   className="group overflow-hidden border-border/50 hover:border-primary/50 transition-all cursor-pointer"
                   onClick={() => {
-                    // Could navigate to a movie detail page in the future
-                    toast(`${movie.title} (${movie.year})`);
+                    setSelectedMovie(movie);
+                    setShowMovieDetail(true);
                   }}
                 >
                   <CardContent className="p-0">
@@ -198,6 +247,16 @@ export default function LikedMovies() {
         variant="destructive" 
         onConfirm={handleReset} 
       />
+
+      {selectedMovie && (
+        <MovieDetailModal
+          movie={selectedMovie}
+          open={showMovieDetail}
+          onOpenChange={setShowMovieDetail}
+          onUnlike={() => handleUnlikeMovie(selectedMovie.id)}
+          showUnlikeButton={true}
+        />
+      )}
     </div>
   );
 }

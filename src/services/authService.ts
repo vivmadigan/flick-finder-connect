@@ -31,6 +31,10 @@ export const authService = {
   },
 
   async signIn(dto: SignInDto): Promise<AuthResponse> {
+    console.log('[authService] signIn called with:', { email: dto.email });
+    console.log('[authService] API_MODE:', API_MODE);
+    console.log('[authService] API_BASE:', API_BASE);
+    
     if (API_MODE === "mock") {
       await delay(400);
       // TODO: remove mock logic when switching to LIVE mode
@@ -42,16 +46,23 @@ export const authService = {
       };
     }
     // TODO: LIVE mode - calls real ASP.NET backend /api/SignIn
+    console.log('[authService] Making fetch request to:', `${API_BASE}/api/SignIn`);
     const res = await fetch(`${API_BASE}/api/SignIn`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dto)
     });
+    console.log('[authService] Response status:', res.status);
+    console.log('[authService] Response ok:', res.ok);
+    
     if (!res.ok) {
       const errorText = await res.text();
+      console.error('[authService] Error response:', errorText);
       throw new Error(errorText || `SignIn failed with status ${res.status}`);
     }
-    return res.json();
+    const data = await res.json();
+    console.log('[authService] Response data:', data);
+    return data;
   },
 
   async myInformation(): Promise<MyInformationDto> {

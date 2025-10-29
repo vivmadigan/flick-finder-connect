@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { DecisionPromptModal } from '@/components/ui/DecisionPromptModal';
+import { FindMatchModal } from '@/components/ui/FindMatchModal';
 import { toast } from 'sonner';
 import { Loader2, RotateCcw } from 'lucide-react';
 import {
@@ -33,6 +34,7 @@ export default function Discover() {
   const [decisionCount, setDecisionCount] = useState(0);
   const [showResetModal, setShowResetModal] = useState(false);
   const [showDecisionPrompt, setShowDecisionPrompt] = useState(false);
+  const [showFindMatchModal, setShowFindMatchModal] = useState(false);
   const [processingAction, setProcessingAction] = useState(false);
 
   console.log('[Discover] Component mounted/rendered');
@@ -123,14 +125,18 @@ export default function Discover() {
       
       console.log('[Discover] Loaded movies:', allMovies);
       console.log('[Discover] Movies count:', allMovies.length);
-      console.log('[Discover] Movies array:', Array.isArray(allMovies));
+      console.log('[Discover] Already liked movie IDs:', likedMovieIds);
       
-      setMovies(allMovies);
+      // Filter out already-liked movies
+      const unlikedMovies = allMovies.filter(movie => !likedMovieIds.includes(movie.id));
+      console.log('[Discover] Filtered to unliked movies:', unlikedMovies.length);
       
-      if (allMovies.length === 0) {
-        toast.info('No movies found for your preferences. Try different filters.');
+      setMovies(unlikedMovies);
+      
+      if (unlikedMovies.length === 0) {
+        toast.info('No new movies found. You\'ve seen them all! Try changing your preferences.');
       } else {
-        toast.success(`Loaded ${allMovies.length} movies!`);
+        toast.success(`Loaded ${unlikedMovies.length} new movies!`);
       }
     } catch (error) {
       console.error('[Discover] Failed to load movies:', error);
@@ -151,7 +157,10 @@ export default function Discover() {
         movies.length,
         50
       );
-      setMovies(prev => [...prev, ...moreMovies]);
+      
+      // Filter out already-liked movies
+      const unlikedMovies = moreMovies.filter(movie => !likedMovieIds.includes(movie.id));
+      setMovies(prev => [...prev, ...unlikedMovies]);
     } catch (error) {
       toast.error('Failed to load more movies');
     } finally {
@@ -176,6 +185,11 @@ export default function Discover() {
         addLikedMovie(movie.id);
         toast.success(`Want to watch ${movie.title}`);
         console.log('[Analytics] Like', { movieId: movie.id, title: movie.title });
+        
+        // Check if user has liked 5+ movies, show find match modal
+        if (likedMovieIds.length + 1 >= 5 && !showFindMatchModal) {
+          setShowFindMatchModal(true);
+        }
       } else {
         console.log('[Discover] Skipping movie:', movie);
         await MoviesService.skipMovie(user.id, movie.id);
@@ -198,7 +212,7 @@ export default function Discover() {
     } finally {
       setProcessingAction(false);
     }
-  }, [user, currentIndex, movies, processingAction, addLikedMovie]);
+  }, [user, currentIndex, movies, processingAction, addLikedMovie, likedMovieIds.length, showFindMatchModal]);
 
   const handleLike = useCallback(() => handleAction('like'), [handleAction]);
   const handleSkip = useCallback(() => handleAction('skip'), [handleAction]);
@@ -346,6 +360,20 @@ export default function Discover() {
         likedCount={likedMovieIds.length}
         onSeeMore={handleSeeMore}
         onFindMatches={handleFindMatches}
+      />
+
+      <FindMatchModal
+        open={showFindMatchModal}
+        onOpenChange={setShowFindMatchModal}
+        onContinue={() => {
+          // Just close modal and continue swiping
+          console.log('[Analytics] Continue-discovering-clicked');
+        }}
+        onFindMatch={() => {
+          console.log('[Analytics] Find-cinematch-clicked', { likedCount: likedMovieIds.length });
+          navigate('/match');
+        }}
+        moviesLikedCount={likedMovieIds.length}
       />
     </div>
   );

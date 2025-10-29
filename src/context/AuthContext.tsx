@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@/types';
 import { authService, isAuthenticated as checkAuth, clearToken } from '@/services/authService';
+import { notificationService } from '@/lib/services/NotificationService';
+import { Logger } from '@/lib/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       if (checkAuth()) {
         try {
+          Logger.auth('Hydrating user from stored token...');
           // TODO: In LIVE mode, this validates the token by calling /api/MyInformation
           const userInfo = await authService.myInformation();
           
@@ -35,8 +38,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           setUser(hydratedUser);
           setToken(localStorage.getItem('access_token'));
+          
+          Logger.auth('User hydrated successfully', {
+            userId: hydratedUser.id,
+            email: hydratedUser.email,
+            displayName: hydratedUser.displayName
+          });
+          
+          // Connect to notification service for real-time match notifications
+          notificationService.connect().then((connected) => {
+            if (connected) {
+              Logger.notification('SignalR', 'Connected on app start');
+              notificationService.requestPermission();
+            }
+          });
         } catch (error) {
-          console.error('Failed to hydrate user:', error);
+          Logger.error('Failed to hydrate user', error);
           // Clear invalid token
           clearToken();
         }
@@ -49,13 +66,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (user: User, token: string) => {
+    Logger.separator();
+    Logger.auth('User logged in', {
+      userId: user.id,
+      email: user.email,
+      displayName: user.displayName
+    });
+    
     setUser(user);
     setToken(token);
     localStorage.setItem('access_token', token);
     localStorage.setItem('cinematch_user', JSON.stringify(user));
+    
+    // Connect to notification service for real-time match notifications
+    notificationService.connect().then((connected) => {
+      if (connected) {
+        Logger.notification('SignalR', 'Connected on login');
+        // Request browser notification permission
+        notificationService.requestPermission();
+      }
+    });
   };
 
   const logout = async () => {
+    Logger.separator();
+    Logger.auth('User logging out', { userId: user?.id, email: user?.email });
+    
+    // Disconnect from notification service
+    await notificationService.disconnect();
+    
     clearToken();
     setUser(null);
     setToken(null);
