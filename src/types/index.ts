@@ -47,9 +47,16 @@ export type Genre =
 
 export type LengthBucket = 'short' | 'medium' | 'long';
 
+// Frontend-facing preferences (UI layer)
 export interface Preferences {
   genre?: Genre;
   lengthBucket?: LengthBucket;
+}
+
+// Backend API preferences format
+export interface PreferencesDTO {
+  genreIds: number[];
+  length: string;
 }
 
 export interface Match {

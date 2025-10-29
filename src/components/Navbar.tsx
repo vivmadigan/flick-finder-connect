@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
-import { User, LogOut, Heart } from 'lucide-react';
+import { User, LogOut, Heart, Bell } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { notificationService } from '@/lib/services/NotificationService';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +16,18 @@ import { Logo } from '@/components/branding/Logo';
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth();
+  const [hasNewMatch, setHasNewMatch] = useState(false);
+
+  useEffect(() => {
+    // Listen for new match notifications
+    if (isAuthenticated) {
+      notificationService.onNewMatch(() => {
+        setHasNewMatch(true);
+        // Auto-clear the badge after 10 seconds
+        setTimeout(() => setHasNewMatch(false), 10000);
+      });
+    }
+  }, [isAuthenticated]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-glass border-b border-border/50 bg-background/50">
@@ -34,6 +48,15 @@ export function Navbar() {
                 <Button variant="ghost" size="sm">
                   <Heart className="w-4 h-4 mr-2" />
                   Liked Movies
+                </Button>
+              </Link>
+              <Link to="/chats">
+                <Button variant="ghost" size="sm" className="relative">
+                  <Bell className="w-4 h-4 mr-2" />
+                  Matches
+                  {hasNewMatch && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  )}
                 </Button>
               </Link>
               <Link to="/chats">

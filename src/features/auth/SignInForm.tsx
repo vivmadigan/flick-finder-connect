@@ -27,12 +27,15 @@ export function SignInForm() {
     setLoading(true);
 
     try {
+      console.log('[SignIn] Starting signin process...', { email: formData.email });
+      
       // Sign in to backend
       const response = await authService.signIn({
         email: formData.email,
         password: formData.password,
       });
 
+      console.log('[SignIn] Backend response:', response);
       saveToken(response.token);
       
       const user = {
@@ -63,38 +66,17 @@ export function SignInForm() {
           lengthExists: savedPreferences && 'lengthBucket' in savedPreferences
         });
         
-        // Check if user has EITHER valid preferences OR liked movies
+        // Per spec: If preferences exist, go to liked movies. If not, go to onboarding.
         if (savedPreferences && savedPreferences.genre && savedPreferences.lengthBucket) {
-          // User has complete preferences, update local state
+          // User has complete preferences, update local state and go to liked movies
           localStorage.setItem('cinematch_preferences', JSON.stringify(savedPreferences));
           updatePreferences(savedPreferences);
-          console.log('[SignIn] User has preferences, navigating to /discover');
-          navigate('/discover');
-        } else if (savedPreferences && (savedPreferences.genre || savedPreferences.lengthBucket)) {
-          // User has partial preferences (this shouldn't happen but handle it)
-          localStorage.setItem('cinematch_preferences', JSON.stringify(savedPreferences));
-          updatePreferences(savedPreferences);
-          console.log('[SignIn] User has partial preferences, navigating to /onboarding to complete');
-          navigate('/onboarding');
+          console.log('[SignIn] User has preferences, navigating to /liked-movies');
+          navigate('/liked-movies');
         } else {
-          // No preferences at all - check if they have liked movies
-          console.log('[SignIn] No preferences found, checking for liked movies...');
-          try {
-            const likedMovies = await MoviesService.getLikedMovies();
-            if (likedMovies && likedMovies.length > 0) {
-              // User has liked movies but no saved preferences - go to liked movies page
-              console.log('[SignIn] User has liked movies but no preferences, navigating to /liked-movies');
-              navigate('/liked-movies');
-            } else {
-              // New user - go to onboarding
-              console.log('[SignIn] New user, navigating to /onboarding');
-              navigate('/onboarding');
-            }
-          } catch (error) {
-            // If we can't fetch liked movies, go to onboarding
-            console.log('[SignIn] Could not fetch liked movies, navigating to /onboarding');
-            navigate('/onboarding');
-          }
+          // No preferences - go to onboarding (new user flow)
+          console.log('[SignIn] No preferences found, navigating to /onboarding');
+          navigate('/onboarding');
         }
       } catch (error) {
         // If preferences fetch fails, go to onboarding to be safe
@@ -102,6 +84,10 @@ export function SignInForm() {
         navigate('/onboarding');
       }
     } catch (error) {
+      console.error('[SignIn] Full error object:', error);
+      console.error('[SignIn] Error type:', typeof error);
+      console.error('[SignIn] Error message:', error instanceof Error ? error.message : String(error));
+      
       const errorMessage = error instanceof Error ? error.message : 'Sign in failed';
       
       if (errorMessage.includes('401')) {

@@ -51,7 +51,20 @@ export class MatchService {
       try {
         // Your backend uses /api/Matches/candidates
         const response = await api.get('/api/Matches/candidates');
-        return response.data;
+        console.log('[LIVE] Raw backend response:', response.data);
+        
+        // Transform backend response to frontend format
+        const matches = response.data.map((match: any) => ({
+          ...match,
+          user: {
+            ...match.user,
+            // Generate avatar if not provided by backend
+            avatar: match.user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${match.user.id || match.user.displayName}`,
+          }
+        }));
+        
+        console.log('[LIVE] Transformed matches:', matches);
+        return matches;
       } catch (error) {
         console.error('[LIVE] Failed to find matches:', error);
         throw error;
@@ -126,5 +139,78 @@ export class MatchService {
         }
       }, 500);
     });
+  }
+
+  /**
+   * Get match candidates - users who liked the same movies
+   */
+  static async getCandidates(): Promise<any[]> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Fetching match candidates');
+      try {
+        const response = await api.get('/api/Matches/candidates');
+        console.log('[LIVE] Candidates:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('[LIVE] Failed to fetch candidates:', error);
+        throw error;
+      }
+    }
+    
+    // MOCK mode
+    console.log('[MOCK] Fetching match candidates');
+    return Promise.resolve([]);
+  }
+
+  /**
+   * Accept a match request (manual matching)
+   * @param targetUserId - The user to match with
+   * @param tmdbId - The movie ID that both users liked
+   */
+  static async acceptMatch(targetUserId: string, tmdbId: number): Promise<{ matched: boolean; roomId?: string }> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Accepting match:', { targetUserId, tmdbId });
+      try {
+        const response = await api.post('/api/Matches/request', {
+          targetUserId,
+          tmdbId
+        });
+        console.log('[LIVE] Match response:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('[LIVE] Failed to accept match:', error);
+        throw error;
+      }
+    }
+    
+    // MOCK mode
+    console.log('[MOCK] Accepting match:', { targetUserId, tmdbId });
+    return Promise.resolve({ matched: true, roomId: `room-${Date.now()}` });
+  }
+
+  /**
+   * Decline a match request
+   * @param targetUserId - The user to decline
+   * @param tmdbId - The movie ID
+   */
+  static async declineMatch(targetUserId: string, tmdbId: number): Promise<void> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Declining match:', { targetUserId, tmdbId });
+      try {
+        await api.post('/api/Matches/decline', {
+          targetUserId,
+          tmdbId
+        });
+        console.log('[LIVE] Match declined');
+      } catch (error) {
+        console.error('[LIVE] Failed to decline match:', error);
+        throw error;
+      }
+      return;
+    }
+    
+    // MOCK mode
+    console.log('[MOCK] Declining match:', { targetUserId, tmdbId });
+    return Promise.resolve();
   }
 }

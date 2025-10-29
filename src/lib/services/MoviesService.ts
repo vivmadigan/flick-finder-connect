@@ -1,6 +1,7 @@
 import { Movie, Genre, LengthBucket } from '@/types';
 import { api } from '@/lib/api';
 import { API_MODE } from '@/services/apiMode';
+import { Logger } from '@/lib/logger';
 
 // MoviesService: MOCK/LIVE pattern
 // MOCK mode: uses in-memory mock data
@@ -250,7 +251,11 @@ export class MoviesService {
 
   static async likeMovie(userId: string, movieId: string, movieData?: { title: string; poster: string; year: number }): Promise<void> {
     if (API_MODE === 'live') {
-      console.log('[LIVE] Liking movie:', { userId, movieId, movieData });
+      Logger.action(`💚 Liking movie`, { 
+        userId, 
+        movieId,
+        title: movieData?.title 
+      });
       try {
         // Your backend uses /api/Movies/{tmdbId}/like
         // According to Swagger, it expects optional movie snapshot info
@@ -264,11 +269,11 @@ export class MoviesService {
           releaseYear: ''
         };
         
-        console.log('[LIVE] Sending like request with body:', body);
+        Logger.api('POST', `/api/Movies/${movieId}/like`, body);
         await api.post(`/api/Movies/${movieId}/like`, body);
-        console.log('[LIVE] Movie liked successfully');
+        Logger.action('✅ Movie liked successfully - backend should create match requests', { movieId });
       } catch (error) {
-        console.error('[LIVE] Failed to like movie:', error);
+        Logger.error('Failed to like movie', error);
         throw error;
       }
       return;
@@ -292,6 +297,25 @@ export class MoviesService {
     return Promise.resolve();
   }
 
+  static async unlikeMovie(userId: string, movieId: string): Promise<void> {
+    if (API_MODE === 'live') {
+      try {
+        Logger.action('Unliking movie', { userId, movieId });
+        Logger.api('DELETE', `/api/Movies/${movieId}/like`);
+        await api.delete(`/api/Movies/${movieId}/like`);
+        Logger.action('✅ Movie unliked successfully', { movieId });
+      } catch (error) {
+        Logger.error('Failed to unlike movie', error);
+        throw error;
+      }
+      return;
+    }
+    
+    // MOCK mode
+    console.log('[MOCK] Unliking movie:', { userId, movieId });
+    return Promise.resolve();
+  }
+
   static async getLikedMovies(): Promise<Movie[]> {
     if (API_MODE === 'live') {
       console.log('[LIVE] Fetching liked movies from backend');
@@ -303,18 +327,26 @@ export class MoviesService {
         interface BackendLikedMovie {
           tmdbId: number;
           title: string;
-          posterPath: string;
+          posterUrl: string; // Backend returns posterUrl (full URL)
           releaseYear: string;
           oneLiner?: string;
           likedAt?: string;
         }
         
-        const likedMovies = (response.data as BackendLikedMovie[]).map((movie) => ({
+        const backendMovies = response.data as BackendLikedMovie[];
+        
+        // Sort by likedAt timestamp (most recent first) as fallback if backend doesn't
+        const sortedMovies = backendMovies.sort((a, b) => {
+          if (!a.likedAt || !b.likedAt) return 0;
+          return new Date(b.likedAt).getTime() - new Date(a.likedAt).getTime();
+        });
+        
+        const likedMovies = sortedMovies.map((movie) => ({
           id: movie.tmdbId.toString(),
           title: movie.title,
           year: parseInt(movie.releaseYear || '0'),
           runtime: 120, // Backend doesn't store runtime, use default
-          poster: movie.posterPath,
+          poster: movie.posterUrl || '', // Backend returns full URL
           genres: [], // Backend doesn't return genres in likes endpoint
           lengthBucket: 'medium' as LengthBucket, // Default
           rating: 0, // Backend doesn't store rating
