@@ -29,7 +29,6 @@ export function FindMatchModal({
             You've liked {moviesLikedCount} movie{moviesLikedCount !== 1 ? 's' : ''}. 
             Ready to find your CineMatch?
           </DialogDescription>
-        </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
