@@ -31,7 +31,7 @@ export default function Discover() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [decisionCount, setDecisionCount] = useState(0);
+  const [sessionDecisionCount, setSessionDecisionCount] = useState(0); // ✅ New: Track only current session
   const [showResetModal, setShowResetModal] = useState(false);
   const [showDecisionPrompt, setShowDecisionPrompt] = useState(false);
   const [showFindMatchModal, setShowFindMatchModal] = useState(false);
@@ -76,27 +76,27 @@ export default function Discover() {
     const savedProgress = localStorage.getItem('cinematch_discover_progress');
     if (savedProgress) {
       try {
-        const { currentIndex: savedIndex, decisionCount: savedCount } = JSON.parse(savedProgress);
+        const { currentIndex: savedIndex } = JSON.parse(savedProgress);
         setCurrentIndex(savedIndex || 0);
-        setDecisionCount(savedCount || 0);
+        // ✅ Don't restore decisionCount - always start fresh at 0 for new session
       } catch (e) {
         console.error('Failed to load progress:', e);
       }
     }
   }, []);
 
-  // Save to localStorage
+  // Save to localStorage (only currentIndex, not session decision count)
   useEffect(() => {
-    localStorage.setItem('cinematch_discover_progress', JSON.stringify({ currentIndex, decisionCount }));
-  }, [currentIndex, decisionCount]);
+    localStorage.setItem('cinematch_discover_progress', JSON.stringify({ currentIndex }));
+  }, [currentIndex]);
 
-  // Check if we should show the decision prompt
+  // Check if we should show the decision prompt (only for current session)
   useEffect(() => {
-    if (decisionCount > 0 && decisionCount % PROMPT_INTERVAL === 0) {
-      setShowDecisionPrompt(true);
-      console.log('[Analytics] Five-pick-prompt-shown', { decisionCount, likedCount: likedMovieIds.length });
+    if (sessionDecisionCount > 0 && sessionDecisionCount % PROMPT_INTERVAL === 0) {
+      setShowFindMatchModal(true); // ✅ Show find match modal instead
+      console.log('[Analytics] Five-pick-prompt-shown', { sessionDecisionCount, likedCount: likedMovieIds.length });
     }
-  }, [decisionCount]);
+  }, [sessionDecisionCount, likedMovieIds.length]);
 
   const loadInitialMovies = async () => {
     console.log('[Discover] Starting loadInitialMovies...');
@@ -196,7 +196,7 @@ export default function Discover() {
         console.log('[Analytics] Skip', { movieId: movie.id, title: movie.title });
       }
       
-      setDecisionCount(prev => prev + 1);
+      setSessionDecisionCount(prev => prev + 1); // ✅ Update session count
       
       // Move to next movie
       if (currentIndex < movies.length - 1) {
@@ -219,13 +219,13 @@ export default function Discover() {
 
   const handleFindMatches = () => {
     if (likedMovieIds.length === 0) return;
-    console.log('[Analytics] Find-match-clicked', { likedCount: likedMovieIds.length, decisionCount });
-    navigate('/match', { state: { likedMovieIds } });
+    console.log('[Analytics] Find-match-clicked', { likedCount: likedMovieIds.length, sessionDecisionCount });
+    navigate('/matches', { state: { likedMovieIds } }); // ✅ Navigate to /matches not /match
   };
 
   const handleSeeMore = () => {
-    setShowDecisionPrompt(false);
-    console.log('[Analytics] See-more-clicked', { decisionCount });
+    setShowFindMatchModal(false); // ✅ Close the find match modal
+    console.log('[Analytics] See-more-clicked', { sessionDecisionCount });
   };
 
   const handleReset = () => {
@@ -266,11 +266,11 @@ export default function Discover() {
               <h1 className="text-4xl font-display font-semibold">Pick movies you'd watch tonight</h1>
               <p className="text-muted-foreground">
                 {likedMovieIds.length > 0 
-                  ? `${likedMovieIds.length} liked · ${decisionCount > 0 ? `${decisionCount} reviewed` : 'Keep going!'}`
+                  ? `${likedMovieIds.length} liked · ${sessionDecisionCount > 0 ? `${sessionDecisionCount} reviewed this session` : 'Keep going!'}`
                   : 'Like at least one movie to find matches'}
               </p>
-              {decisionCount < 5 && decisionCount > 0 && (
-                <p className="text-sm text-muted-foreground">{decisionCount} / 5</p>
+              {sessionDecisionCount < 5 && sessionDecisionCount > 0 && (
+                <p className="text-sm text-muted-foreground">{sessionDecisionCount} / 5</p>
               )}
             </div>
             <TooltipProvider>
@@ -356,7 +356,7 @@ export default function Discover() {
       <DecisionPromptModal
         open={showDecisionPrompt}
         onOpenChange={setShowDecisionPrompt}
-        decisionCount={decisionCount}
+        decisionCount={sessionDecisionCount}
         likedCount={likedMovieIds.length}
         onSeeMore={handleSeeMore}
         onFindMatches={handleFindMatches}

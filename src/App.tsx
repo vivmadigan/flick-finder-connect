@@ -13,6 +13,7 @@ import Register from "./pages/Register";
 import Onboarding from "./pages/Onboarding";
 import Discover from "./pages/Discover";
 import Match from "./pages/Match";
+import ActiveMatches from "./pages/ActiveMatches";
 import Chats from "./pages/Chats";
 import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
@@ -38,6 +39,8 @@ const App = () => (
                   <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
                   <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
                   <Route path="/match" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+                  <Route path="/matches" element={<ProtectedRoute><Match /></ProtectedRoute>} />
+                  <Route path="/active-matches" element={<ProtectedRoute><ActiveMatches /></ProtectedRoute>} />
                   <Route path="/liked-movies" element={<ProtectedRoute><LikedMovies /></ProtectedRoute>} />
                   <Route path="/chats" element={<ProtectedRoute><Chats /></ProtectedRoute>} />
                   <Route path="/chat/:roomId" element={<ProtectedRoute><Chat /></ProtectedRoute>} />

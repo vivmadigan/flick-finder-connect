@@ -213,4 +213,25 @@ export class MatchService {
     console.log('[MOCK] Declining match:', { targetUserId, tmdbId });
     return Promise.resolve();
   }
+
+  /**
+   * Get active matches - users you've already matched with (have chat rooms)
+   */
+  static async getActiveMatches(): Promise<any[]> {
+    if (API_MODE === 'live') {
+      console.log('[LIVE] Fetching active matches');
+      try {
+        const response = await api.get('/api/Matches/active');
+        console.log('[LIVE] Active matches:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('[LIVE] Failed to fetch active matches:', error);
+        throw error;
+      }
+    }
+    
+    // MOCK mode
+    console.log('[MOCK] Fetching active matches');
+    return Promise.resolve([]);
+  }
 }
