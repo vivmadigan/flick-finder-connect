@@ -8,7 +8,8 @@ import { Logger } from '@/lib/logger';
 
 export class NotificationService {
   private connection: signalR.HubConnection | null = null;
-  private onNewMatchCallback: ((matchData: any) => void) | null = null;
+  private onMutualMatchCallback: ((matchData: any) => void) | null = null;
+  private onMatchRequestCallback: ((matchData: any) => void) | null = null;
 
   async connect(): Promise<boolean> {
     if (API_MODE === 'mock') {
@@ -33,42 +34,63 @@ export class NotificationService {
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
-      // Listen for "NewMatch" events from backend
-      // Note: With manual matching, we only listen for mutual match confirmations
-      this.connection.on('NewMatch', (matchData: any) => {
-        Logger.match('Received match notification', matchData);
+      // Listen for "matchRequestReceived" - Someone sent you a match request
+      this.connection.on('matchRequestReceived', (notification: any) => {
+        Logger.match('📬 Match request received', notification);
         
-        // Only handle mutual match notifications (when both users clicked "Match")
-        if (matchData.type === 'mutualMatch' && matchData.roomId) {
-          Logger.match('🎉 MUTUAL MATCH! Chat room created', {
-            roomId: matchData.roomId,
-            otherUser: matchData.user?.displayName,
-            movie: matchData.sharedMovieTitle
-          });
-          
-          // Show toast notification (non-blocking)
-          toast.success(`It's a match! 🎉`, {
-            description: `You and ${matchData.user?.displayName || 'someone'} both liked "${matchData.sharedMovieTitle || 'the same movie'}"!`,
-            duration: 10000,
-            action: {
-              label: 'Open Chat',
-              onClick: () => {
-                window.location.href = `/chat/${matchData.roomId}`;
-              },
+        toast.info(notification.message || 'Someone wants to match with you!', {
+          description: notification.sharedMoviesCount 
+            ? `${notification.sharedMoviesCount} shared ${notification.sharedMoviesCount === 1 ? 'movie' : 'movies'}`
+            : undefined,
+          duration: 8000,
+          action: {
+            label: 'View Matches',
+            onClick: () => {
+              window.location.href = '/matches';
             },
-          });
-          
-          // Show browser notification
-          this.showBrowserNotification(
-            'It\'s a Match! 🎉',
-            `You and ${matchData.user?.displayName || 'someone'} can chat now!`
-          );
-        }
-        // Ignore other notification types (auto-match requests no longer sent)
+          },
+        });
 
-        // Call registered callback if any
-        if (this.onNewMatchCallback) {
-          this.onNewMatchCallback(matchData);
+        // Browser notification
+        this.showBrowserNotification(
+          'New Match Request',
+          notification.message || `${notification.user?.displayName || 'Someone'} wants to match with you!`
+        );
+
+        // Call registered callback
+        if (this.onMatchRequestCallback) {
+          this.onMatchRequestCallback(notification);
+        }
+      });
+
+      // Listen for "mutualMatch" - Both users matched, chat room created
+      this.connection.on('mutualMatch', (notification: any) => {
+        Logger.match('🎉 MUTUAL MATCH! Chat room created', {
+          roomId: notification.roomId,
+          otherUser: notification.user?.displayName,
+          movie: notification.sharedMovieTitle
+        });
+        
+        toast.success(`It's a match! 🎉`, {
+          description: `You and ${notification.user?.displayName || 'someone'} both liked "${notification.sharedMovieTitle || 'the same movie'}"!`,
+          duration: 10000,
+          action: {
+            label: 'Open Chat',
+            onClick: () => {
+              window.location.href = `/chat/${notification.roomId}`;
+            },
+          },
+        });
+        
+        // Browser notification
+        this.showBrowserNotification(
+          'It\'s a Match! 🎉',
+          `You and ${notification.user?.displayName || 'someone'} can chat now!`
+        );
+
+        // Call registered callback
+        if (this.onMutualMatchCallback) {
+          this.onMutualMatchCallback(notification);
         }
       });
 
@@ -111,9 +133,18 @@ export class NotificationService {
     return this.connection?.state === signalR.HubConnectionState.Connected;
   }
 
-  // Register a callback for when new matches arrive
-  onNewMatch(callback: (matchData: any) => void): void {
-    this.onNewMatchCallback = callback;
+  // Register callbacks for different event types
+  onMutualMatch(callback: (matchData: any) => void): void {
+    this.onMutualMatchCallback = callback;
+  }
+
+  onMatchRequest(callback: (matchData: any) => void): void {
+    this.onMatchRequestCallback = callback;
+  }
+
+  // Get the SignalR connection for direct access if needed
+  getConnection(): signalR.HubConnection | null {
+    return this.connection;
   }
 
   // Request browser notification permission

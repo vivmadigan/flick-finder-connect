@@ -6,16 +6,28 @@ import { MatchService } from '@/lib/services/MatchService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, PartyPopper, Film, Heart, X, Users } from 'lucide-react';
+import { Loader2, PartyPopper, Film, Heart, X, Users, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { formatDistanceToNow } from 'date-fns';
+
+interface SharedMovie {
+  tmdbId: number;
+  title: string;
+  posterUrl: string;
+  releaseYear?: string | null;
+}
+
+type MatchStatus = 'none' | 'pending_sent' | 'pending_received' | 'matched';
 
 interface Candidate {
   userId: string;
   displayName: string;
   overlapCount: number;
   sharedMovieIds: number[];
+  sharedMovies: SharedMovie[]; // Backend now provides this!
+  matchStatus: MatchStatus; // Backend now provides this!
+  requestSentAt?: string | null; // NEW: Timestamp when current user sent request
 }
 
 export default function Match() {
@@ -25,6 +37,7 @@ export default function Match() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  // Removed pendingMatchIds - backend now provides matchStatus!
 
   useEffect(() => {
     setPreset('standard');
@@ -45,6 +58,7 @@ export default function Match() {
     try {
       console.log('[Match] Fetching match candidates');
       
+      // Backend now returns full candidate data with match status and shared movies!
       const candidatesData = await MatchService.getCandidates();
       
       console.log('[Match] Received candidates:', candidatesData);
@@ -92,8 +106,12 @@ export default function Match() {
           description: `Waiting for ${candidate.displayName} to respond`,
         });
         
-        // Remove from list since we've already sent a request
-        setCandidates(prev => prev.filter(c => c.userId !== candidate.userId));
+        // Update the candidate's status to pending_sent
+        setCandidates(prev => prev.map(c => 
+          c.userId === candidate.userId 
+            ? { ...c, matchStatus: 'pending_sent' as MatchStatus }
+            : c
+        ));
       }
     } catch (error) {
       toast.error('Failed to send match request');
@@ -225,54 +243,109 @@ export default function Match() {
                       </div>
                     </div>
 
-                    {/* Shared Movies Badge */}
-                    <div className="flex flex-wrap gap-1.5">
-                      {candidate.sharedMovieIds.slice(0, 3).map((movieId, idx) => (
-                        <Badge 
-                          key={movieId} 
-                          variant="secondary" 
-                          className="text-xs"
-                        >
-                          Movie #{idx + 1}
-                        </Badge>
-                      ))}
-                      {candidate.sharedMovieIds.length > 3 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{candidate.sharedMovieIds.length - 3} more
-                        </Badge>
-                      )}
-                    </div>
+                    {/* Shared Movies */}
+                    {candidate.sharedMovies && candidate.sharedMovies.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                          <Film className="w-3 h-3" />
+                          You both picked:
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {candidate.sharedMovies.slice(0, 3).map((movie) => (
+                            <div
+                              key={movie.tmdbId}
+                              className="group relative overflow-hidden rounded-lg aspect-[2/3]"
+                            >
+                              <img
+                                src={movie.posterUrl}
+                                alt={movie.title}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                                <p className="text-white text-xs font-medium line-clamp-2 leading-tight">
+                                  {movie.title}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {candidate.sharedMovies.length > 3 && (
+                          <p className="text-xs text-muted-foreground text-center">
+                            +{candidate.sharedMovies.length - 3} more shared {candidate.sharedMovies.length - 3 === 1 ? 'movie' : 'movies'}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground text-center py-2">
+                        {candidate.overlapCount} shared {candidate.overlapCount === 1 ? 'movie' : 'movies'}
+                      </div>
+                    )}
+
+                    {/* Match Status Message */}
+                    {candidate.matchStatus === 'pending_received' && (
+                      <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 rounded-lg p-2">
+                        <Clock className="w-3.5 h-3.5 animate-pulse" />
+                        <span className="font-medium">{candidate.displayName} is waiting for your response!</span>
+                      </div>
+                    )}
+
+                    {candidate.matchStatus === 'pending_sent' && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted rounded-lg p-2">
+                        <Clock className="w-3.5 h-3.5 animate-pulse" />
+                        <span>
+                          Waiting for {candidate.displayName} to respond
+                          {candidate.requestSentAt && ` (sent ${formatDistanceToNow(new Date(candidate.requestSentAt), { addSuffix: true })})`}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors"
-                        onClick={() => handleDecline(candidate)}
-                        disabled={processingIds.has(candidate.userId)}
-                      >
-                        {processingIds.has(candidate.userId) ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            <X className="w-4 h-4 mr-1" />
-                            Decline
-                          </>
-                        )}
-                      </Button>
+                      {candidate.matchStatus !== 'pending_sent' && candidate.matchStatus !== 'matched' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 hover:bg-destructive/10 hover:border-destructive hover:text-destructive transition-colors"
+                          onClick={() => handleDecline(candidate)}
+                          disabled={processingIds.has(candidate.userId)}
+                        >
+                          {processingIds.has(candidate.userId) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <X className="w-4 h-4 mr-1" />
+                              Decline
+                            </>
+                          )}
+                        </Button>
+                      )}
                       <Button
                         size="sm"
                         className="flex-1"
+                        variant={candidate.matchStatus === 'pending_sent' ? "outline" : "default"}
                         onClick={() => handleMatch(candidate)}
-                        disabled={processingIds.has(candidate.userId)}
+                        disabled={
+                          processingIds.has(candidate.userId) || 
+                          candidate.matchStatus === 'pending_sent' || 
+                          candidate.matchStatus === 'matched'
+                        }
                       >
                         {processingIds.has(candidate.userId) ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : candidate.matchStatus === 'matched' ? (
+                          <>
+                            <Heart className="w-4 h-4 mr-1 fill-current" />
+                            Matched!
+                          </>
+                        ) : candidate.matchStatus === 'pending_sent' ? (
+                          <>
+                            <Clock className="w-4 h-4 mr-1 animate-pulse" />
+                            Pending
+                          </>
                         ) : (
                           <>
                             <Heart className="w-4 h-4 mr-1" />
-                            Match
+                            {candidate.matchStatus === 'pending_received' ? 'Accept Match' : 'Match'}
                           </>
                         )}
                       </Button>
