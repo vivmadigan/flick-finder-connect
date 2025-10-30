@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useVisualFX } from '@/context/VisualFXProvider';
 import { Conversation } from '@/types';
+import { ChatService } from '@/lib/services/ChatService';
+import { notificationService } from '@/lib/services/NotificationService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import { debugFlow } from '@/lib/debug';
 
 export default function Chats() {
   const navigate = useNavigate();
@@ -21,29 +24,52 @@ export default function Chats() {
     setPreset('dense');
   }, [setPreset]);
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  const loadConversations = async () => {
+  const loadConversations = useCallback(async () => {
+    if (!user) return;
+    
     setLoading(true);
     try {
-      // TODO: Replace with ChatService.listConversations()
-      // const data = await ChatService.listConversations(user.id);
-      // For now, use mock data
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Mock conversations (empty for now)
-      setConversations([]);
+      debugFlow.apiCall('GET', '/api/Chats', { userId: user.id });
+      const data = await ChatService.listConversations(user.id);
+      debugFlow.apiResponse('/api/Chats', 200, { count: data.length });
+      setConversations(data);
     } catch (error) {
       toast.error('Failed to load conversations');
       console.error('Failed to load conversations:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Listen for mutualMatch events to auto-refresh conversations
+  useEffect(() => {
+    if (!user) return;
+
+    debugFlow.userAction('Chats', 'Subscribing to mutualMatch events');
+
+    notificationService.onMutualMatch((data) => {
+      debugFlow.signalREvent('mutualMatch', data);
+      
+      toast.success('New match! 🎉', {
+        description: 'Your conversation list has been updated',
+      });
+      
+      // Refresh conversations to include new match
+      loadConversations();
+    });
+
+    return () => {
+      debugFlow.userAction('Chats', 'Unsubscribing from mutualMatch events');
+      notificationService.onMutualMatch(() => {}); // Clear callback
+    };
+  }, [user, loadConversations]);
 
   const handleConversationClick = (conversation: Conversation) => {
+    debugFlow.navigate('/chats', `/chat/${conversation.roomId}`, 'Open conversation');
     navigate(`/chat/${conversation.roomId}`, {
       state: { otherUser: conversation.otherUser }
     });

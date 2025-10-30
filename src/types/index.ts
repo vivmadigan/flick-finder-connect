@@ -83,6 +83,25 @@ export interface ChatRoom {
   match: Match;
 }
 
+export interface SharedMovie {
+  tmdbId: number;
+  title: string;
+  posterUrl: string;
+  releaseYear?: string | null;
+}
+
+export type MatchStatus = 'none' | 'pending_sent' | 'pending_received' | 'matched' | 'declined';
+
+export interface MatchCandidate {
+  userId: string;
+  displayName: string;
+  overlapCount: number;
+  sharedMovieIds: number[];
+  sharedMovies: SharedMovie[];
+  matchStatus: MatchStatus;
+  requestSentAt?: string;
+}
+
 export interface AuthResponse {
   user: User;
   token: string;

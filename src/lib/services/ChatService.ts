@@ -2,6 +2,8 @@ import { ChatMessage, ChatRoom, Conversation, User } from '@/types';
 import { SignalRChatService } from './SignalRChatService';
 import { API_MODE, API_BASE, TOKEN_KEY } from '@/services/apiMode';
 import { toast } from 'sonner';
+import { ChatAdapter, BackendMessage, BackendConversation } from '@/lib/adapters';
+import { debugFlow } from '@/lib/debug';
 
 // ChatService: follows MOCK/LIVE pattern (like authService.ts)
 // MOCK mode: in-memory data with simulated delays
@@ -40,27 +42,38 @@ export class ChatService {
 
   static async listConversations(userId: string): Promise<Conversation[]> {
     if (API_MODE === 'mock') {
-      console.log('[MOCK] Listing conversations');
+      debugFlow.apiCall('GET', '/api/Chats (MOCK)');
       await new Promise(resolve => setTimeout(resolve, 300));
       return [];
     }
 
     // LIVE mode
-    console.log('[LIVE] Listing conversations from backend');
+    const endpoint = `${API_BASE}/api/Chats`;
+    debugFlow.apiCall('GET', endpoint);
+    
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const response = await fetch(`${API_BASE}/api/Chats`, {
+      const response = await fetch(endpoint, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
+      debugFlow.apiResponse('/api/Chats', response.status);
+      
       if (!response.ok) {
         throw new Error(`Failed to list conversations: ${response.status}`);
       }
       
-      return response.json();
+      const backendData: BackendConversation[] = await response.json();
+      const conversations = backendData.map(ChatAdapter.conversationFromDTO);
+      
+      debugFlow.transform('BackendConversation[]', 'Conversation[]', {
+        count: conversations.length,
+      });
+      
+      return conversations;
     } catch (error) {
       console.error('[LIVE] Failed to list conversations:', error);
       throw error;
@@ -163,41 +176,110 @@ export class ChatService {
 
   static async getMessages(roomId: string): Promise<ChatMessage[]> {
     if (API_MODE === 'mock') {
-      console.log('[MOCK] Getting messages for room:', roomId);
+      debugFlow.apiCall('GET', `/api/Chats/${roomId}/messages (MOCK)`);
       await new Promise(resolve => setTimeout(resolve, 300));
       return mockMessages.get(roomId) || [];
     }
 
     // LIVE mode
-    console.log('[LIVE] Getting messages from backend');
+    const endpoint = `${API_BASE}/api/Chats/${roomId}/messages?take=50`;
+    debugFlow.apiCall('GET', endpoint);
+    
     try {
       const token = localStorage.getItem(TOKEN_KEY);
-      const response = await fetch(`${API_BASE}/api/Chats/${roomId}/messages?take=50`, {
+      const response = await fetch(endpoint, {
         headers: { 
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
+      debugFlow.apiResponse(`/api/Chats/${roomId}/messages`, response.status);
+      
       if (!response.ok) {
         throw new Error(`Failed to get messages: ${response.status}`);
       }
       
-      return response.json();
+      const backendData: BackendMessage[] = await response.json();
+      
+      // 🔍 DEBUG: Log raw backend timestamps
+      console.log('[ChatService] Raw backend messages:', backendData.map(m => ({
+        text: m.text.substring(0, 20),
+        sentAt: m.sentAt,
+        parsed: new Date(m.sentAt)
+      })));
+      
+      const messages = backendData
+        .map(ChatAdapter.messageFromDTO)
+        .filter(msg => {
+          // Filter out messages with invalid timestamps
+          if (!msg.timestamp || Number.isNaN(msg.timestamp.getTime())) {
+            console.warn('[ChatService] Skipping message with invalid timestamp:', msg.id);
+            return false;
+          }
+          return true;
+        })
+        .sort((a, b) => {
+          // ✅ Sort messages by timestamp (oldest first)
+          return a.timestamp.getTime() - b.timestamp.getTime();
+        });
+      
+      // 🔍 DEBUG: Log sorted messages
+      console.log('[ChatService] Sorted messages:', messages.map(m => ({
+        content: m.content.substring(0, 20),
+        timestamp: m.timestamp,
+        ms: m.timestamp.getTime()
+      })));
+      
+      debugFlow.transform('BackendMessage[]', 'ChatMessage[]', {
+        count: messages.length,
+        roomId,
+        sorted: true
+      });
+      
+      return messages;
     } catch (error) {
       console.error('[LIVE] Failed to get messages:', error);
       throw error;
     }
   }
 
+  /**
+   * Leave SignalR room group ONLY (for navigation)
+   * Does NOT deactivate membership - user stays in chat list
+   */
+  static leaveSignalRRoom(roomId: string): void {
+    console.log('[ChatService] Leaving SignalR group (navigation)', { roomId });
+    debugFlow.userAction('ChatService', 'Leaving SignalR group only', { roomId });
+    
+    if (API_MODE === 'live' && signalRService?.isConnected()) {
+      try {
+        signalRService.leaveRoom(roomId);
+        console.log('[ChatService] Left SignalR group (membership still active)');
+      } catch (error) {
+        console.error('[ChatService] Failed to leave SignalR group:', error);
+      }
+    }
+  }
+
+  /**
+   * Leave room permanently (unmatch/block)
+   * Deactivates membership in database - chat disappears from list
+   */
   static async leaveRoom(roomId: string, userId: string): Promise<void> {
-    console.log('[ChatService] Leaving room:', { roomId, userId });
+    console.log('[ChatService] 🚪 LEAVING ROOM PERMANENTLY - Deactivating membership!', { roomId, userId });
+    debugFlow.userAction('ChatService', '🚪 LEAVING ROOM PERMANENTLY', { 
+      roomId, 
+      userId,
+      timestamp: new Date().toISOString(),
+      stack: new Error().stack // Capture stack trace to see who called this
+    });
     
     if (API_MODE === 'live' && signalRService?.isConnected()) {
       try {
         await signalRService.leaveRoom(roomId);
         
-        // Also call API to mark as left
+        // ⚠️ THIS SETS IsActive=false IN DATABASE
         const token = localStorage.getItem(TOKEN_KEY);
         await fetch(`${API_BASE}/api/Chats/${roomId}/leave`, {
           method: 'POST',
@@ -207,7 +289,7 @@ export class ChatService {
           }
         });
         
-        console.log('[ChatService] Left room via SignalR (LIVE)');
+        console.log('[ChatService] Left room via SignalR AND deactivated membership (LIVE)');
       } catch (error) {
         console.error('[ChatService] Failed to leave room:', error);
       }

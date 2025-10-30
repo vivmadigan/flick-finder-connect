@@ -50,10 +50,7 @@ export function Navbar() {
                   Liked Movies
                 </Button>
               </Link>
-              <Link 
-                to="/matches" 
-                onClick={() => console.log('[Navbar] Clicked Matches link, navigating to /matches')}
-              >
+              <Link to="/matches">
                 <Button variant="ghost" size="sm" className="relative">
                   <Bell className="w-4 h-4 mr-2" />
                   Matches
@@ -62,7 +59,7 @@ export function Navbar() {
                   )}
                 </Button>
               </Link>
-              <Link to="/active-matches">
+              <Link to="/chats">
                 <Button variant="ghost" size="sm">
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Chats
