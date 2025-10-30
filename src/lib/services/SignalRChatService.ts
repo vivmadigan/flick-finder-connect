@@ -1,6 +1,7 @@
 import * as signalR from '@microsoft/signalr';
 import { ChatMessage } from '@/types';
 import { API_BASE, TOKEN_KEY } from '@/services/apiMode';
+import { ChatAdapter, BackendMessage } from '@/lib/adapters';
 
 // SignalR connection to ASP.NET Web API /chathub
 // Hub methods: JoinRoom(roomId), SendMessage(roomId, content), LeaveRoom(roomId)
@@ -36,9 +37,25 @@ export class SignalRChatService {
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
-      this.connection.on('ReceiveMessage', (message: ChatMessage) => {
-        console.log('[SignalR] Message received:', message);
-        this.messageCallbacks.forEach(cb => cb(message));
+      this.connection.on('ReceiveMessage', (backendMessage: BackendMessage) => {
+        console.log('[SignalR] Message received (raw):', backendMessage);
+        
+        try {
+          // ✅ Transform backend message to frontend format using adapter
+          const message = ChatAdapter.messageFromDTO(backendMessage);
+          
+          // ✅ Validate timestamp to prevent crashes
+          if (!message.timestamp || Number.isNaN(message.timestamp.getTime())) {
+            console.warn('[SignalR] Invalid timestamp on message, dropping:', backendMessage);
+            return;
+          }
+          
+          console.log('[SignalR] Message transformed:', message);
+          this.messageCallbacks.forEach(cb => cb(message));
+        } catch (error) {
+          console.error('[SignalR] Failed to map backend message:', error, backendMessage);
+          // Don't crash the app, just log and continue
+        }
       });
 
       this.connection.onreconnecting((error) => {

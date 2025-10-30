@@ -10,37 +10,21 @@ import { Loader2, PartyPopper, Film, Heart, X, Users, Clock } from 'lucide-react
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-
-interface SharedMovie {
-  tmdbId: number;
-  title: string;
-  posterUrl: string;
-  releaseYear?: string | null;
-}
-
-type MatchStatus = 'none' | 'pending_sent' | 'pending_received' | 'matched';
-
-interface Candidate {
-  userId: string;
-  displayName: string;
-  overlapCount: number;
-  sharedMovieIds: number[];
-  sharedMovies: SharedMovie[]; // Backend now provides this!
-  matchStatus: MatchStatus; // Backend now provides this!
-  requestSentAt?: string | null; // NEW: Timestamp when current user sent request
-}
+import { MatchCandidate } from '@/types';
+import { debugFlow } from '@/lib/debug';
+import { MatchStateMachine, MatchCardState } from '@/lib/state/MatchStateMachine';
 
 export default function Match() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { setPreset } = useVisualFX();
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidates, setCandidates] = useState<MatchCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
-  // Removed pendingMatchIds - backend now provides matchStatus!
 
   useEffect(() => {
     setPreset('standard');
+    debugFlow.userAction('Match', 'Component mounted');
   }, [setPreset]);
 
   useEffect(() => {
@@ -56,12 +40,14 @@ export default function Match() {
     
     setLoading(true);
     try {
-      console.log('[Match] Fetching match candidates');
+      debugFlow.apiCall('GET', '/api/Matches/candidates');
       
-      // Backend now returns full candidate data with match status and shared movies!
       const candidatesData = await MatchService.getCandidates();
       
-      console.log('[Match] Received candidates:', candidatesData);
+      debugFlow.apiResponse('/api/Matches/candidates', 200, {
+        count: candidatesData.length,
+      });
+      
       setCandidates(candidatesData);
       
       if (candidatesData.length > 0) {
@@ -75,7 +61,7 @@ export default function Match() {
     }
   };
 
-  const handleMatch = async (candidate: Candidate) => {
+  const handleMatch = async (candidate: MatchCandidate) => {
     if (!user) return;
     
     // Use the first shared movie for the match request
@@ -84,17 +70,31 @@ export default function Match() {
     setProcessingIds(prev => new Set(prev).add(candidate.userId));
     
     try {
-      console.log('[Match] Accepting match:', { targetUserId: candidate.userId, tmdbId });
+      debugFlow.userAction('Match', 'Accepting match', {
+        targetUserId: candidate.userId,
+        targetDisplayName: candidate.displayName,
+        tmdbId,
+      });
       
       const result = await MatchService.acceptMatch(candidate.userId, tmdbId);
       
       if (result.matched && result.roomId) {
         // Mutual match - both users accepted!
+        debugFlow.stateChange(
+          'MatchCard',
+          candidate.matchStatus,
+          'matched',
+          'Mutual match confirmed'
+        );
+        
         toast.success('It\'s a match! 🎉', {
           description: `You and ${candidate.displayName} matched!`,
           action: {
             label: 'Open Chat',
-            onClick: () => navigate(`/chat/${result.roomId}`),
+            onClick: () => {
+              debugFlow.navigate('/matches', `/chat/${result.roomId}`, 'Open match chat');
+              navigate(`/chat/${result.roomId}`);
+            },
           },
         });
         
@@ -102,6 +102,13 @@ export default function Match() {
         setCandidates(prev => prev.filter(c => c.userId !== candidate.userId));
       } else {
         // Request sent, waiting for their response
+        debugFlow.stateChange(
+          'MatchCard',
+          candidate.matchStatus,
+          'pending_sent',
+          'Match request sent'
+        );
+        
         toast.success('Match request sent!', {
           description: `Waiting for ${candidate.displayName} to respond`,
         });
@@ -109,7 +116,7 @@ export default function Match() {
         // Update the candidate's status to pending_sent
         setCandidates(prev => prev.map(c => 
           c.userId === candidate.userId 
-            ? { ...c, matchStatus: 'pending_sent' as MatchStatus }
+            ? { ...c, matchStatus: 'pending_sent' }
             : c
         ));
       }
@@ -125,7 +132,7 @@ export default function Match() {
     }
   };
 
-  const handleDecline = async (candidate: Candidate) => {
+  const handleDecline = async (candidate: MatchCandidate) => {
     if (!user) return;
     
     const tmdbId = candidate.sharedMovieIds[0];
@@ -133,9 +140,20 @@ export default function Match() {
     setProcessingIds(prev => new Set(prev).add(candidate.userId));
     
     try {
-      console.log('[Match] Declining match:', { targetUserId: candidate.userId, tmdbId });
+      debugFlow.userAction('Match', 'Declining match', {
+        targetUserId: candidate.userId,
+        targetDisplayName: candidate.displayName,
+        tmdbId,
+      });
       
       await MatchService.declineMatch(candidate.userId, tmdbId);
+      
+      debugFlow.stateChange(
+        'MatchCard',
+        candidate.matchStatus,
+        'declined',
+        'User declined match'
+      );
       
       toast('Passed', {
         description: `You declined ${candidate.displayName}`,

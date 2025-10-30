@@ -8,7 +8,21 @@ import { useAuth } from '@/context/AuthContext';
 import { ChatService } from '@/lib/services/ChatService';
 import { Send } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
+
+/**
+ * Safely format a timestamp, returning empty string if invalid
+ * Prevents crashes from malformed Date objects
+ */
+const safeFormatTime = (timestamp: Date | undefined): string => {
+  if (!timestamp) return '';
+  try {
+    return isValid(timestamp) ? format(timestamp, 'p') : '';
+  } catch {
+    return '';
+  }
+};
+import { debugFlow } from '@/lib/debug';
 
 interface ChatWindowProps {
   roomId: string;
@@ -21,36 +35,72 @@ export function ChatWindow({ roomId, otherUserName, otherUserAvatar }: ChatWindo
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    loadMessages();
+    debugFlow.userAction('ChatWindow', 'Component mounted for room', { roomId });
+    
+    // Load messages immediately
+    const loadInitialMessages = async () => {
+      try {
+        debugFlow.apiCall('GET', `/api/Chats/${roomId}/messages`);
+        const msgs = await ChatService.getMessages(roomId);
+        debugFlow.apiResponse(`/api/Chats/${roomId}/messages`, 200, { count: msgs.length });
+        
+        // 🔍 DEBUG: Log timestamps to verify sorting
+        console.log('[ChatWindow] Loaded messages with timestamps:', msgs.map(m => ({
+          content: m.content.substring(0, 20),
+          timestamp: m.timestamp,
+          time: safeFormatTime(m.timestamp)
+        })));
+        
+        setMessages(msgs);
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    };
+    
+    loadInitialMessages();
+    
+    // Capture userId to avoid dependency on user object
+    const currentUserId = user?.id;
     
     // Subscribe to new messages
     const unsubscribe = ChatService.onMessage((message) => {
       if (message.roomId === roomId) {
+        // 🚫 Filter out echo: Don't add our own messages (already added optimistically)
+        if (message.senderId === currentUserId) {
+          debugFlow.userAction('ChatWindow', 'Ignoring echo of own message', { 
+            messageId: message.id 
+          });
+          return; // Skip our own messages from SignalR
+        }
+        
+        debugFlow.userAction('ChatWindow', 'Received new message from other user', { 
+          messageId: message.id,
+          roomId: message.roomId,
+          senderName: message.senderName
+        });
+        // ✅ Use functional update to avoid stale state
         setMessages((prev) => [...prev, message]);
       }
     });
 
-    return unsubscribe;
-  }, [roomId]);
+    return () => {
+      debugFlow.userAction('ChatWindow', 'Cleanup - unsubscribing from messages for room', { roomId });
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId]); // ✅ CRITICAL: ONLY roomId - user?.id captured as const to avoid re-runs
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    // ScrollArea from shadcn wraps content in a viewport div
+    const viewport = scrollViewportRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (viewport) {
+      viewport.scrollTop = viewport.scrollHeight;
     }
   }, [messages]);
-
-  const loadMessages = async () => {
-    try {
-      const msgs = await ChatService.getMessages(roomId);
-      setMessages(msgs);
-    } catch (error) {
-      console.error('Failed to load messages:', error);
-    }
-  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,16 +108,28 @@ export function ChatWindow({ roomId, otherUserName, otherUserAvatar }: ChatWindo
 
     setLoading(true);
     try {
+      debugFlow.userAction('ChatWindow', 'Sending message', { 
+        roomId, 
+        contentLength: input.trim().length 
+      });
+      
       const message = await ChatService.sendMessage(
         roomId,
         user.id,
         user.displayName,
         input.trim()
       );
+      
+      debugFlow.userAction('ChatWindow', 'Message sent successfully', { 
+        messageId: message.id 
+      });
+      
+      // ✅ Add message to local state immediately for optimistic update
       setMessages((prev) => [...prev, message]);
       setInput('');
     } catch (error) {
       console.error('Failed to send message:', error);
+      debugFlow.userAction('ChatWindow', 'Failed to send message', { error });
     } finally {
       setLoading(false);
     }
@@ -85,8 +147,8 @@ export function ChatWindow({ roomId, otherUserName, otherUserAvatar }: ChatWindo
         </div>
       </CardHeader>
       
-      <CardContent className="flex-1 flex flex-col p-0">
-        <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+        <ScrollArea className="flex-1 p-4" ref={scrollViewportRef}>
           <div className="space-y-4">
             {messages.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
@@ -120,7 +182,7 @@ export function ChatWindow({ roomId, otherUserName, otherUserAvatar }: ChatWindo
                         <p className="text-sm">{message.content}</p>
                       </div>
                       <p className="text-xs text-muted-foreground px-3">
-                        {format(new Date(message.timestamp), 'p')}
+                        {safeFormatTime(message.timestamp)}
                       </p>
                     </div>
                   </div>
